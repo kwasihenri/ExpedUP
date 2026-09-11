@@ -25,7 +25,7 @@ from exporters import (
     export_json_file, export_csv_file, export_all_formats
 )
 from icons import get_icon
-from settings_manager import load_settings, save_settings, reset_to_defaults
+from settings_manager import load_settings, save_settings, reset_to_defaults, TEXT_SCALE_MAP
 
 # Configure light appearance by default (Vectihost & Selligine design system)
 ctk.set_appearance_mode("Light")
@@ -40,6 +40,11 @@ class ExpedUPApp(ctk.CTk):
         self.settings = load_settings()
         saved_theme = self.settings.get("theme", "Light")
         ctk.set_appearance_mode(saved_theme)
+
+        # Apply UI Text & Font Scale (Default: Large 110%)
+        saved_text_size = self.settings.get("text_size", "Large (110%)")
+        scale_val = TEXT_SCALE_MAP.get(saved_text_size, 1.1)
+        ctk.set_widget_scaling(scale_val)
 
         # Window Configuration
         self.title(f"{APP_NAME} v{VERSION} — Universal OSINT & Brand Reconnaissance Engine")
@@ -108,7 +113,7 @@ class ExpedUPApp(ctk.CTk):
         version_badge = ctk.CTkLabel(
             title_box,
             text=f"v{VERSION}",
-            font=ctk.CTkFont(size=11, weight="bold"),
+            font=ctk.CTkFont(size=12, weight="bold"),
             fg_color=THEME_COLORS["primary"],
             text_color="#ffffff",
             corner_radius=6,
@@ -119,7 +124,7 @@ class ExpedUPApp(ctk.CTk):
         subtitle_label = ctk.CTkLabel(
             title_box,
             text=f"— {APP_SUBTITLE}",
-            font=ctk.CTkFont(size=12),
+            font=ctk.CTkFont(size=13),
             text_color=THEME_COLORS["text_secondary"]
         )
         subtitle_label.pack(side="left")
@@ -134,7 +139,7 @@ class ExpedUPApp(ctk.CTk):
             text="  READY FOR MISSION",
             image=self._get_icon("circle-check", (12, 12), THEME_COLORS["accent"]),
             compound="left",
-            font=ctk.CTkFont(size=11, weight="bold"),
+            font=ctk.CTkFont(size=12, weight="bold"),
             text_color=THEME_COLORS["accent"],
             fg_color=THEME_COLORS["card_subtle"],
             corner_radius=12,
@@ -148,7 +153,7 @@ class ExpedUPApp(ctk.CTk):
             controls_box,
             text="Dark Mode" if current_theme == "Dark" else "Light Mode",
             command=self._toggle_appearance,
-            font=ctk.CTkFont(size=12),
+            font=ctk.CTkFont(size=13),
             progress_color=THEME_COLORS["primary"],
             onvalue="Dark", offvalue="Light"
         )
@@ -186,7 +191,7 @@ class ExpedUPApp(ctk.CTk):
         # 1. PARAMETERS CARD
         param_header = ctk.CTkLabel(
             scroll_sidebar, text="TARGET RECONNAISSANCE",
-            font=ctk.CTkFont(size=12, weight="bold"),
+            font=ctk.CTkFont(size=13, weight="bold"),
             text_color=THEME_COLORS["primary"]
         )
         param_header.pack(anchor="w", pady=(0, 8))
@@ -194,7 +199,7 @@ class ExpedUPApp(ctk.CTk):
         # Primary Target Field (Always Visible)
         ctk.CTkLabel(
             scroll_sidebar, text="Target Name, Handle or Keyword *",
-            font=ctk.CTkFont(size=11, weight="bold"),
+            font=ctk.CTkFont(size=12, weight="bold"),
             text_color=THEME_COLORS["text_primary"]
         ).pack(anchor="w")
         self.entry_target = ctk.CTkEntry(
@@ -202,14 +207,15 @@ class ExpedUPApp(ctk.CTk):
             height=36, fg_color=THEME_COLORS["input_bg"],
             border_color=THEME_COLORS["border"],
             text_color=THEME_COLORS["text_primary"],
-            placeholder_text_color=THEME_COLORS["text_muted"]
+            placeholder_text_color=THEME_COLORS["text_muted"],
+            font=ctk.CTkFont(size=12)
         )
         self.entry_target.pack(fill="x", pady=(2, 10))
 
         # Recon Depth Mode
         ctk.CTkLabel(
             scroll_sidebar, text="Reconnaissance Depth",
-            font=ctk.CTkFont(size=11), text_color=THEME_COLORS["text_secondary"]
+            font=ctk.CTkFont(size=12), text_color=THEME_COLORS["text_secondary"]
         ).pack(anchor="w")
         self.seg_depth = ctk.CTkSegmentedButton(
             scroll_sidebar, values=["Standard", "Deep (Multi-Engine)"],
@@ -217,7 +223,8 @@ class ExpedUPApp(ctk.CTk):
             selected_hover_color=THEME_COLORS["primary_hover"],
             unselected_color=THEME_COLORS["card_subtle"],
             unselected_hover_color=THEME_COLORS["secondary_hover"],
-            text_color=THEME_COLORS["text_primary"]
+            text_color=THEME_COLORS["text_primary"],
+            font=ctk.CTkFont(size=12, weight="bold")
         )
         self.seg_depth.set(self.settings.get("default_depth", "Deep (Multi-Engine)"))
         self.seg_depth.pack(fill="x", pady=(4, 10))
@@ -226,7 +233,7 @@ class ExpedUPApp(ctk.CTk):
         self.switch_strict_keyword = ctk.CTkSwitch(
             scroll_sidebar,
             text="Strict Go By Keyword",
-            font=ctk.CTkFont(size=11),
+            font=ctk.CTkFont(size=12),
             progress_color=THEME_COLORS["primary"],
             text_color=THEME_COLORS["text_secondary"]
         )
@@ -243,7 +250,7 @@ class ExpedUPApp(ctk.CTk):
             hover_color=THEME_COLORS["secondary_hover"],
             text_color=THEME_COLORS["secondary_text"],
             border_width=1, border_color=THEME_COLORS["border"],
-            font=ctk.CTkFont(size=11)
+            font=ctk.CTkFont(size=12)
         )
         self.btn_toggle_advanced.pack(fill="x", pady=(0, 10))
 
@@ -261,42 +268,45 @@ class ExpedUPApp(ctk.CTk):
         # Location Field
         ctk.CTkLabel(
             adv_inner, text="Geographic Anchor (Optional)",
-            font=ctk.CTkFont(size=11), text_color=THEME_COLORS["text_secondary"]
+            font=ctk.CTkFont(size=12), text_color=THEME_COLORS["text_secondary"]
         ).pack(anchor="w")
         self.entry_location = ctk.CTkEntry(
             adv_inner, placeholder_text="e.g. London, UK or New York",
             height=32, fg_color=THEME_COLORS["input_bg"],
             border_color=THEME_COLORS["border"],
             text_color=THEME_COLORS["text_primary"],
-            placeholder_text_color=THEME_COLORS["text_muted"]
+            placeholder_text_color=THEME_COLORS["text_muted"],
+            font=ctk.CTkFont(size=12)
         )
         self.entry_location.pack(fill="x", pady=(2, 8))
 
         # Category Field
         ctk.CTkLabel(
             adv_inner, text="Category / Industry Anchor (Optional)",
-            font=ctk.CTkFont(size=11), text_color=THEME_COLORS["text_secondary"]
+            font=ctk.CTkFont(size=12), text_color=THEME_COLORS["text_secondary"]
         ).pack(anchor="w")
         self.entry_category = ctk.CTkEntry(
             adv_inner, placeholder_text="e.g. Logistics, E-commerce",
             height=32, fg_color=THEME_COLORS["input_bg"],
             border_color=THEME_COLORS["border"],
             text_color=THEME_COLORS["text_primary"],
-            placeholder_text_color=THEME_COLORS["text_muted"]
+            placeholder_text_color=THEME_COLORS["text_muted"],
+            font=ctk.CTkFont(size=12)
         )
         self.entry_category.pack(fill="x", pady=(2, 8))
 
         # Phone Field
         ctk.CTkLabel(
             adv_inner, text="Seed Phone / Contact (Optional)",
-            font=ctk.CTkFont(size=11), text_color=THEME_COLORS["text_secondary"]
+            font=ctk.CTkFont(size=12), text_color=THEME_COLORS["text_secondary"]
         ).pack(anchor="w")
         self.entry_phone = ctk.CTkEntry(
             adv_inner, placeholder_text="e.g. +44 20 7946 0919",
             height=32, fg_color=THEME_COLORS["input_bg"],
             border_color=THEME_COLORS["border"],
             text_color=THEME_COLORS["text_primary"],
-            placeholder_text_color=THEME_COLORS["text_muted"]
+            placeholder_text_color=THEME_COLORS["text_muted"],
+            font=ctk.CTkFont(size=12)
         )
         self.entry_phone.pack(fill="x", pady=(2, 2))
 
@@ -310,7 +320,7 @@ class ExpedUPApp(ctk.CTk):
             hover_color=THEME_COLORS["secondary_hover"],
             text_color=THEME_COLORS["secondary_text"],
             border_width=1, border_color=THEME_COLORS["border"],
-            font=ctk.CTkFont(size=11)
+            font=ctk.CTkFont(size=12)
         )
         self.btn_clear.pack(fill="x", pady=(0, 10))
 
@@ -321,7 +331,7 @@ class ExpedUPApp(ctk.CTk):
         # 2. EXECUTION CONTROLS
         ctrl_header = ctk.CTkLabel(
             scroll_sidebar, text="MISSION EXECUTION",
-            font=ctk.CTkFont(size=12, weight="bold"),
+            font=ctk.CTkFont(size=13, weight="bold"),
             text_color=THEME_COLORS["primary"]
         )
         ctrl_header.pack(anchor="w", pady=(0, 8))
@@ -331,7 +341,7 @@ class ExpedUPApp(ctk.CTk):
             image=self._get_icon("play", (16, 16), "#ffffff"),
             compound="left",
             command=self._start_expedition,
-            height=42, font=ctk.CTkFont(size=13, weight="bold"),
+            height=42, font=ctk.CTkFont(size=14, weight="bold"),
             fg_color=THEME_COLORS["primary"],
             hover_color=THEME_COLORS["primary_hover"],
             text_color="#ffffff"
@@ -344,7 +354,7 @@ class ExpedUPApp(ctk.CTk):
             compound="left",
             command=self._stop_expedition,
             state="disabled", height=34,
-            font=ctk.CTkFont(size=12, weight="bold"),
+            font=ctk.CTkFont(size=13, weight="bold"),
             fg_color=THEME_COLORS["danger"],
             hover_color="#dc2626",
             text_color="#ffffff"
@@ -362,7 +372,7 @@ class ExpedUPApp(ctk.CTk):
 
         self.lbl_progress_status = ctk.CTkLabel(
             scroll_sidebar, text="Ready for mission launch.",
-            font=ctk.CTkFont(size=10), text_color=THEME_COLORS["text_secondary"],
+            font=ctk.CTkFont(size=11), text_color=THEME_COLORS["text_secondary"],
             anchor="w"
         )
         self.lbl_progress_status.pack(fill="x", pady=(0, 12))
@@ -373,7 +383,7 @@ class ExpedUPApp(ctk.CTk):
         # 3. EXPORT INTELLIGENCE HUB
         export_header = ctk.CTkLabel(
             scroll_sidebar, text="INTELLIGENCE EXPORT HUB",
-            font=ctk.CTkFont(size=12, weight="bold"),
+            font=ctk.CTkFont(size=13, weight="bold"),
             text_color=THEME_COLORS["primary"]
         )
         export_header.pack(anchor="w", pady=(0, 8))
@@ -383,7 +393,7 @@ class ExpedUPApp(ctk.CTk):
             image=self._get_icon("download", (15, 15), "#ffffff"),
             compound="left",
             command=lambda: self._export_data("all"),
-            height=34, font=ctk.CTkFont(size=12, weight="bold"),
+            height=36, font=ctk.CTkFont(size=13, weight="bold"),
             fg_color=THEME_COLORS["success"],
             hover_color="#15803d",
             text_color="#ffffff"
@@ -402,7 +412,7 @@ class ExpedUPApp(ctk.CTk):
             hover_color=THEME_COLORS["secondary_hover"],
             text_color=THEME_COLORS["secondary_text"],
             border_width=1, border_color=THEME_COLORS["border"],
-            font=ctk.CTkFont(size=11)
+            font=ctk.CTkFont(size=12)
         )
         self.btn_export_md.pack(side="left", fill="x", expand=True, padx=(0, 3))
 
@@ -415,7 +425,7 @@ class ExpedUPApp(ctk.CTk):
             hover_color=THEME_COLORS["secondary_hover"],
             text_color=THEME_COLORS["secondary_text"],
             border_width=1, border_color=THEME_COLORS["border"],
-            font=ctk.CTkFont(size=11)
+            font=ctk.CTkFont(size=12)
         )
         self.btn_export_csv.pack(side="left", fill="x", expand=True, padx=(3, 3))
 
@@ -428,7 +438,7 @@ class ExpedUPApp(ctk.CTk):
             hover_color=THEME_COLORS["secondary_hover"],
             text_color=THEME_COLORS["secondary_text"],
             border_width=1, border_color=THEME_COLORS["border"],
-            font=ctk.CTkFont(size=11)
+            font=ctk.CTkFont(size=12)
         )
         self.btn_export_json.pack(side="right", fill="x", expand=True, padx=(3, 0))
 
@@ -441,14 +451,14 @@ class ExpedUPApp(ctk.CTk):
             hover_color=THEME_COLORS["secondary_hover"],
             text_color=THEME_COLORS["secondary_text"],
             border_width=1, border_color=THEME_COLORS["border"],
-            font=ctk.CTkFont(size=11)
+            font=ctk.CTkFont(size=12)
         )
         self.btn_open_folder.pack(fill="x", pady=(4, 8))
 
         # Status Toast Label
         self.lbl_export_toast = ctk.CTkLabel(
             scroll_sidebar, text="",
-            font=ctk.CTkFont(size=10), text_color=THEME_COLORS["success"],
+            font=ctk.CTkFont(size=11), text_color=THEME_COLORS["success"],
             wraplength=280
         )
         self.lbl_export_toast.pack(fill="x", pady=(2, 0))
@@ -481,6 +491,7 @@ class ExpedUPApp(ctk.CTk):
             text_color=THEME_COLORS["text_primary"],
             border_width=1, border_color=THEME_COLORS["border"]
         )
+        self.tabview._segmented_button.configure(font=ctk.CTkFont(size=13, weight="bold"))
         self.tabview.pack(side="right", fill="both", expand=True)
 
         # Tabs
@@ -538,14 +549,14 @@ class ExpedUPApp(ctk.CTk):
 
             val_lbl = ctk.CTkLabel(
                 top_kpi, text=default_val,
-                font=ctk.CTkFont(size=22, weight="bold"),
+                font=ctk.CTkFont(size=24, weight="bold"),
                 text_color=accent_col
             )
             val_lbl.pack(side="left")
 
             title_lbl = ctk.CTkLabel(
                 card, text=title,
-                font=ctk.CTkFont(size=11, weight="bold"),
+                font=ctk.CTkFont(size=12, weight="bold"),
                 text_color=THEME_COLORS["text_primary"]
             )
             title_lbl.pack(pady=(0, 8))
@@ -575,20 +586,20 @@ class ExpedUPApp(ctk.CTk):
 
         ctk.CTkLabel(
             card_clearance, text="BRAND CLEARANCE & UNIQUENESS (FOR BRAND CREATORS)",
-            font=ctk.CTkFont(size=10, weight="bold"),
+            font=ctk.CTkFont(size=11, weight="bold"),
             text_color=THEME_COLORS["primary"]
         ).pack(anchor="w", padx=10, pady=(8, 2))
 
         self.lbl_clearance_score = ctk.CTkLabel(
             card_clearance, text="Uniqueness Score: --/100",
-            font=ctk.CTkFont(size=15, weight="bold"),
+            font=ctk.CTkFont(size=16, weight="bold"),
             text_color=THEME_COLORS["text_primary"]
         )
         self.lbl_clearance_score.pack(anchor="w", padx=10, pady=(0, 2))
 
         self.lbl_clearance_verdict = ctk.CTkLabel(
             card_clearance, text="Launch an expedition to assess handle collisions and name availability.",
-            font=ctk.CTkFont(size=11),
+            font=ctk.CTkFont(size=12),
             text_color=THEME_COLORS["text_secondary"],
             wraplength=350, justify="left", anchor="w"
         )
@@ -604,13 +615,13 @@ class ExpedUPApp(ctk.CTk):
 
         ctk.CTkLabel(
             card_profile, text="BUSINESS PROFILE & SYSTEM BLUEPRINT (FOR DEVELOPERS)",
-            font=ctk.CTkFont(size=10, weight="bold"),
+            font=ctk.CTkFont(size=11, weight="bold"),
             text_color=THEME_COLORS["accent"]
         ).pack(anchor="w", padx=10, pady=(8, 2))
 
         self.lbl_biz_base = ctk.CTkLabel(
             card_profile, text="Operating Base: --",
-            font=ctk.CTkFont(size=13, weight="bold"),
+            font=ctk.CTkFont(size=14, weight="bold"),
             text_color=THEME_COLORS["text_primary"],
             anchor="w"
         )
@@ -618,7 +629,7 @@ class ExpedUPApp(ctk.CTk):
 
         self.lbl_biz_details = ctk.CTkLabel(
             card_profile, text="Services, WhatsApp contacts, and architectural blueprint will be synthesized.",
-            font=ctk.CTkFont(size=11),
+            font=ctk.CTkFont(size=12),
             text_color=THEME_COLORS["text_secondary"],
             wraplength=350, justify="left", anchor="w"
         )
@@ -630,7 +641,7 @@ class ExpedUPApp(ctk.CTk):
 
         ctk.CTkLabel(
             preview_header_row, text="PUBLICATION-READY DOSSIER PREVIEW",
-            font=ctk.CTkFont(size=12, weight="bold"),
+            font=ctk.CTkFont(size=13, weight="bold"),
             text_color=THEME_COLORS["primary"]
         ).pack(side="left")
 
@@ -639,7 +650,7 @@ class ExpedUPApp(ctk.CTk):
             image=self._get_icon("copy", (13, 13), THEME_COLORS["secondary_text"]),
             compound="left",
             command=self._copy_dossier_to_clipboard,
-            width=120, height=26, font=ctk.CTkFont(size=11),
+            width=120, height=26, font=ctk.CTkFont(size=12),
             fg_color=THEME_COLORS["secondary"],
             hover_color=THEME_COLORS["secondary_hover"],
             text_color=THEME_COLORS["secondary_text"],
@@ -649,7 +660,7 @@ class ExpedUPApp(ctk.CTk):
         # Dossier Textbox
         self.txt_dossier_preview = ctk.CTkTextbox(
             self.tab_overview, wrap="word",
-            font=ctk.CTkFont(family="Consolas", size=11),
+            font=ctk.CTkFont(family="Consolas", size=12),
             fg_color=THEME_COLORS["card_subtle"],
             text_color=THEME_COLORS["text_primary"],
             border_width=1, border_color=THEME_COLORS["border"]
@@ -667,7 +678,7 @@ class ExpedUPApp(ctk.CTk):
 
         self.lbl_search_count = ctk.CTkLabel(
             header_bar, text="0 search results indexed.",
-            font=ctk.CTkFont(size=12, weight="bold"),
+            font=ctk.CTkFont(size=13, weight="bold"),
             text_color=THEME_COLORS["text_primary"]
         )
         self.lbl_search_count.pack(side="left")
@@ -694,7 +705,7 @@ class ExpedUPApp(ctk.CTk):
         engine_name = item.get("engine", "Search Engine")
         engine_badge = ctk.CTkLabel(
             top_row, text=f"[{engine_name}]",
-            font=ctk.CTkFont(size=10, weight="bold"),
+            font=ctk.CTkFont(size=11, weight="bold"),
             text_color=THEME_COLORS["primary"],
             fg_color=THEME_COLORS["secondary"],
             corner_radius=4, padx=6, pady=2
@@ -704,7 +715,7 @@ class ExpedUPApp(ctk.CTk):
         title = item.get("title", "Untitled Web Result")
         title_lbl = ctk.CTkLabel(
             top_row, text=title,
-            font=ctk.CTkFont(size=13, weight="bold"),
+            font=ctk.CTkFont(size=14, weight="bold"),
             text_color=THEME_COLORS["text_primary"],
             anchor="w", wraplength=600
         )
@@ -717,7 +728,7 @@ class ExpedUPApp(ctk.CTk):
         url = item.get("url", "")
         url_lbl = ctk.CTkLabel(
             url_row, text=url[:80] + ("..." if len(url) > 80 else ""),
-            font=ctk.CTkFont(size=11),
+            font=ctk.CTkFont(size=12),
             text_color=THEME_COLORS["primary"],
             anchor="w"
         )
@@ -728,7 +739,7 @@ class ExpedUPApp(ctk.CTk):
             image=self._get_icon("external-link", (12, 12), THEME_COLORS["accent"]),
             compound="left",
             command=lambda u=url: webbrowser.open(u),
-            font=ctk.CTkFont(size=10, weight="bold"),
+            font=ctk.CTkFont(size=11, weight="bold"),
             fg_color=THEME_COLORS["card"],
             hover_color=THEME_COLORS["secondary_hover"],
             text_color=THEME_COLORS["text_primary"],
@@ -741,7 +752,7 @@ class ExpedUPApp(ctk.CTk):
             image=self._get_icon("copy", (12, 12), THEME_COLORS["secondary_text"]),
             compound="left",
             command=lambda u=url: self._copy_to_clipboard(u),
-            font=ctk.CTkFont(size=10),
+            font=ctk.CTkFont(size=11),
             fg_color=THEME_COLORS["card"],
             hover_color=THEME_COLORS["secondary_hover"],
             text_color=THEME_COLORS["secondary_text"],
@@ -761,7 +772,7 @@ class ExpedUPApp(ctk.CTk):
 
             snip_lbl = ctk.CTkLabel(
                 snip_box, text=f'"{snippet}"',
-                font=ctk.CTkFont(size=11), text_color=THEME_COLORS["text_secondary"],
+                font=ctk.CTkFont(size=12), text_color=THEME_COLORS["text_secondary"],
                 wraplength=720, justify="left", anchor="w"
             )
             snip_lbl.pack(fill="x", padx=10, pady=8)
@@ -776,7 +787,7 @@ class ExpedUPApp(ctk.CTk):
 
         self.lbl_social_count = ctk.CTkLabel(
             header_bar, text="0 active social profiles discovered.",
-            font=ctk.CTkFont(size=12, weight="bold"),
+            font=ctk.CTkFont(size=13, weight="bold"),
             text_color=THEME_COLORS["text_primary"]
         )
         self.lbl_social_count.pack(side="left")
@@ -806,14 +817,14 @@ class ExpedUPApp(ctk.CTk):
 
         plat_label = ctk.CTkLabel(
             top_row, text=plat_name,
-            font=ctk.CTkFont(size=14, weight="bold"),
+            font=ctk.CTkFont(size=15, weight="bold"),
             text_color=THEME_COLORS["text_primary"]
         )
         plat_label.pack(side="left")
 
         cat_badge = ctk.CTkLabel(
             top_row, text=f"({category})",
-            font=ctk.CTkFont(size=11),
+            font=ctk.CTkFont(size=12),
             text_color=THEME_COLORS["text_secondary"]
         )
         cat_badge.pack(side="left", padx=(8, 0))
@@ -825,7 +836,7 @@ class ExpedUPApp(ctk.CTk):
         status_badge = ctk.CTkLabel(
             top_row, text=status_text,
             image=status_icon, compound="left",
-            font=ctk.CTkFont(size=11, weight="bold"),
+            font=ctk.CTkFont(size=12, weight="bold"),
             text_color=status_color
         )
         status_badge.pack(side="right")
@@ -837,7 +848,7 @@ class ExpedUPApp(ctk.CTk):
 
         url_lbl = ctk.CTkLabel(
             url_row, text=url,
-            font=ctk.CTkFont(size=11),
+            font=ctk.CTkFont(size=12),
             text_color=THEME_COLORS["primary"],
             anchor="w"
         )
@@ -849,7 +860,7 @@ class ExpedUPApp(ctk.CTk):
                 image=self._get_icon("external-link", (12, 12), "#ffffff"),
                 compound="left",
                 command=lambda u=url: webbrowser.open(u),
-                font=ctk.CTkFont(size=10, weight="bold"),
+                font=ctk.CTkFont(size=11, weight="bold"),
                 fg_color=THEME_COLORS["primary"],
                 hover_color=THEME_COLORS["primary_hover"],
                 text_color="#ffffff"
@@ -868,7 +879,7 @@ class ExpedUPApp(ctk.CTk):
 
             desc_lbl = ctk.CTkLabel(
                 desc_box, text=desc,
-                font=ctk.CTkFont(size=11), text_color=THEME_COLORS["text_secondary"],
+                font=ctk.CTkFont(size=12), text_color=THEME_COLORS["text_secondary"],
                 wraplength=720, justify="left", anchor="w"
             )
             desc_lbl.pack(fill="x", padx=10, pady=6)
@@ -896,7 +907,7 @@ class ExpedUPApp(ctk.CTk):
             phone_card, text="  DISCOVERED PHONE NUMBERS",
             image=self._get_icon("phone", (14, 14), THEME_COLORS["warning"]),
             compound="left",
-            font=ctk.CTkFont(size=12, weight="bold"),
+            font=ctk.CTkFont(size=13, weight="bold"),
             text_color=THEME_COLORS["warning"]
         ).pack(anchor="w", padx=12, pady=(10, 6))
 
@@ -904,7 +915,7 @@ class ExpedUPApp(ctk.CTk):
         self.frame_phones_list.pack(fill="x", padx=12, pady=(0, 10))
         self.lbl_no_phones = ctk.CTkLabel(
             self.frame_phones_list, text="No phone numbers discovered yet.",
-            font=ctk.CTkFont(size=11), text_color=THEME_COLORS["text_muted"]
+            font=ctk.CTkFont(size=12), text_color=THEME_COLORS["text_muted"]
         )
         self.lbl_no_phones.pack(anchor="w")
 
@@ -920,7 +931,7 @@ class ExpedUPApp(ctk.CTk):
             email_card, text="  DISCOVERED EMAIL ADDRESSES",
             image=self._get_icon("mail", (14, 14), THEME_COLORS["accent_purple"]),
             compound="left",
-            font=ctk.CTkFont(size=12, weight="bold"),
+            font=ctk.CTkFont(size=13, weight="bold"),
             text_color=THEME_COLORS["accent_purple"]
         ).pack(anchor="w", padx=12, pady=(10, 6))
 
@@ -928,7 +939,7 @@ class ExpedUPApp(ctk.CTk):
         self.frame_emails_list.pack(fill="x", padx=12, pady=(0, 10))
         self.lbl_no_emails = ctk.CTkLabel(
             self.frame_emails_list, text="No email addresses discovered yet.",
-            font=ctk.CTkFont(size=11), text_color=THEME_COLORS["text_muted"]
+            font=ctk.CTkFont(size=12), text_color=THEME_COLORS["text_muted"]
         )
         self.lbl_no_emails.pack(anchor="w")
 
@@ -948,13 +959,13 @@ class ExpedUPApp(ctk.CTk):
             mentions_card, text="  SOCIAL MENTIONS (@)",
             image=self._get_icon("at", (14, 14), THEME_COLORS["primary"]),
             compound="left",
-            font=ctk.CTkFont(size=12, weight="bold"),
+            font=ctk.CTkFont(size=13, weight="bold"),
             text_color=THEME_COLORS["primary"]
         ).pack(anchor="w", padx=12, pady=(10, 6))
 
         self.txt_mentions = ctk.CTkTextbox(
             mentions_card, height=100, wrap="word",
-            font=ctk.CTkFont(family="Consolas", size=11),
+            font=ctk.CTkFont(family="Consolas", size=12),
             fg_color=THEME_COLORS["card"],
             text_color=THEME_COLORS["text_primary"],
             border_width=1, border_color=THEME_COLORS["border"]
@@ -973,13 +984,13 @@ class ExpedUPApp(ctk.CTk):
             hashtags_card, text="  ASSOCIATED HASHTAGS (#)",
             image=self._get_icon("hash", (14, 14), THEME_COLORS["accent"]),
             compound="left",
-            font=ctk.CTkFont(size=12, weight="bold"),
+            font=ctk.CTkFont(size=13, weight="bold"),
             text_color=THEME_COLORS["accent"]
         ).pack(anchor="w", padx=12, pady=(10, 6))
 
         self.txt_hashtags = ctk.CTkTextbox(
             hashtags_card, height=100, wrap="word",
-            font=ctk.CTkFont(family="Consolas", size=11),
+            font=ctk.CTkFont(family="Consolas", size=12),
             fg_color=THEME_COLORS["card"],
             text_color=THEME_COLORS["text_primary"],
             border_width=1, border_color=THEME_COLORS["border"]
@@ -998,7 +1009,7 @@ class ExpedUPApp(ctk.CTk):
             domain_card, text="  REGISTERED DOMAINS & DNS RECONNAISSANCE",
             image=self._get_icon("world", (14, 14), THEME_COLORS["success"]),
             compound="left",
-            font=ctk.CTkFont(size=12, weight="bold"),
+            font=ctk.CTkFont(size=13, weight="bold"),
             text_color=THEME_COLORS["success"]
         ).pack(anchor="w", padx=12, pady=(10, 6))
 
@@ -1006,7 +1017,7 @@ class ExpedUPApp(ctk.CTk):
         self.frame_domains_list.pack(fill="x", padx=12, pady=(0, 10))
         self.lbl_no_domains = ctk.CTkLabel(
             self.frame_domains_list, text="No registered domains detected for standard TLDs.",
-            font=ctk.CTkFont(size=11), text_color=THEME_COLORS["text_muted"]
+            font=ctk.CTkFont(size=12), text_color=THEME_COLORS["text_muted"]
         )
         self.lbl_no_domains.pack(anchor="w")
 
@@ -1026,7 +1037,7 @@ class ExpedUPApp(ctk.CTk):
             row, text=f"  {phone}",
             image=self._get_icon("phone", (13, 13), THEME_COLORS["warning"]),
             compound="left",
-            font=ctk.CTkFont(size=12, weight="bold"),
+            font=ctk.CTkFont(size=13, weight="bold"),
             text_color=THEME_COLORS["text_primary"]
         )
         lbl.pack(side="left", padx=10, pady=4)
@@ -1036,7 +1047,7 @@ class ExpedUPApp(ctk.CTk):
             image=self._get_icon("copy", (11, 11), THEME_COLORS["secondary_text"]),
             compound="left",
             command=lambda p=phone: self._copy_to_clipboard(p),
-            font=ctk.CTkFont(size=10),
+            font=ctk.CTkFont(size=11),
             fg_color=THEME_COLORS["secondary"],
             hover_color=THEME_COLORS["secondary_hover"],
             text_color=THEME_COLORS["secondary_text"],
@@ -1060,7 +1071,7 @@ class ExpedUPApp(ctk.CTk):
             row, text=f"  {email}",
             image=self._get_icon("mail", (13, 13), THEME_COLORS["accent_purple"]),
             compound="left",
-            font=ctk.CTkFont(size=12),
+            font=ctk.CTkFont(size=13),
             text_color=THEME_COLORS["text_primary"]
         )
         lbl.pack(side="left", padx=10, pady=4)
@@ -1070,7 +1081,7 @@ class ExpedUPApp(ctk.CTk):
             image=self._get_icon("copy", (11, 11), THEME_COLORS["secondary_text"]),
             compound="left",
             command=lambda e=email: self._copy_to_clipboard(e),
-            font=ctk.CTkFont(size=10),
+            font=ctk.CTkFont(size=11),
             fg_color=THEME_COLORS["secondary"],
             hover_color=THEME_COLORS["secondary_hover"],
             text_color=THEME_COLORS["secondary_text"],
@@ -1100,7 +1111,7 @@ class ExpedUPApp(ctk.CTk):
             row, text=info,
             image=self._get_icon("world", (13, 13), THEME_COLORS["accent"]),
             compound="left",
-            font=ctk.CTkFont(size=11),
+            font=ctk.CTkFont(size=12),
             text_color=THEME_COLORS["text_primary"]
         )
         lbl.pack(side="left", padx=10, pady=6)
@@ -1110,7 +1121,7 @@ class ExpedUPApp(ctk.CTk):
             image=self._get_icon("external-link", (11, 11), THEME_COLORS["accent"]),
             compound="left",
             command=lambda d=domain: webbrowser.open(f"https://{d}"),
-            font=ctk.CTkFont(size=10),
+            font=ctk.CTkFont(size=11),
             fg_color=THEME_COLORS["secondary"],
             hover_color=THEME_COLORS["secondary_hover"],
             text_color=THEME_COLORS["secondary_text"],
@@ -1128,7 +1139,7 @@ class ExpedUPApp(ctk.CTk):
 
         ctk.CTkLabel(
             action_bar, text="REAL-TIME MISSION RECON LOGS",
-            font=ctk.CTkFont(size=12, weight="bold"),
+            font=ctk.CTkFont(size=13, weight="bold"),
             text_color=THEME_COLORS["primary"]
         ).pack(side="left")
 
@@ -1137,7 +1148,7 @@ class ExpedUPApp(ctk.CTk):
             image=self._get_icon("copy", (13, 13), THEME_COLORS["secondary_text"]),
             compound="left",
             command=self._copy_logs_to_clipboard,
-            font=ctk.CTkFont(size=11),
+            font=ctk.CTkFont(size=12),
             fg_color=THEME_COLORS["secondary"],
             hover_color=THEME_COLORS["secondary_hover"],
             text_color=THEME_COLORS["secondary_text"],
@@ -1149,7 +1160,7 @@ class ExpedUPApp(ctk.CTk):
             image=self._get_icon("trash", (13, 13), THEME_COLORS["secondary_text"]),
             compound="left",
             command=self._clear_console,
-            font=ctk.CTkFont(size=11),
+            font=ctk.CTkFont(size=12),
             fg_color=THEME_COLORS["secondary"],
             hover_color=THEME_COLORS["secondary_hover"],
             text_color=THEME_COLORS["secondary_text"],
@@ -1158,7 +1169,7 @@ class ExpedUPApp(ctk.CTk):
 
         self.txt_console = ctk.CTkTextbox(
             self.tab_console, wrap="word",
-            font=ctk.CTkFont(family="Consolas", size=11),
+            font=ctk.CTkFont(family="Consolas", size=12),
             fg_color=THEME_COLORS["console_bg"],
             text_color=THEME_COLORS["console_text"],
             border_width=1, border_color=THEME_COLORS["border"]
@@ -1200,14 +1211,14 @@ class ExpedUPApp(ctk.CTk):
         ctk.CTkLabel(
             title_row,
             text="EXPEDUP ENGINE & ENVIRONMENT CONFIGURATION",
-            font=ctk.CTkFont(size=14, weight="bold"),
+            font=ctk.CTkFont(size=15, weight="bold"),
             text_color=THEME_COLORS["text_primary"]
         ).pack(side="left")
 
         ctk.CTkLabel(
             banner_inner,
             text="Fine-tune network evasion, reconnaissance depth, target platforms, storage paths, and auto-export behavior.",
-            font=ctk.CTkFont(size=11),
+            font=ctk.CTkFont(size=12),
             text_color=THEME_COLORS["text_secondary"]
         ).pack(anchor="w", pady=(4, 0))
 
@@ -1232,7 +1243,7 @@ class ExpedUPApp(ctk.CTk):
         ).pack(side="left", padx=(0, 6))
         ctk.CTkLabel(
             sec_header1, text="INTERFACE & WORKFLOW",
-            font=ctk.CTkFont(size=12, weight="bold"),
+            font=ctk.CTkFont(size=13, weight="bold"),
             text_color=THEME_COLORS["primary"]
         ).pack(side="left")
 
@@ -1246,24 +1257,24 @@ class ExpedUPApp(ctk.CTk):
         box_theme.grid(row=0, column=0, sticky="nsew", padx=(0, 10))
         ctk.CTkLabel(
             box_theme, text="Interface Appearance Theme",
-            font=ctk.CTkFont(size=11, weight="bold"),
+            font=ctk.CTkFont(size=13, weight="bold"),
             text_color=THEME_COLORS["text_primary"]
         ).pack(anchor="w", pady=(0, 4))
         ctk.CTkLabel(
-            box_theme, text="Choose default visual appearance (Light default, dual-token contrast).",
-            font=ctk.CTkFont(size=10), text_color=THEME_COLORS["text_secondary"]
+            box_theme, text="Choose default visual appearance (Light default, dual-token contrast). Applies upon Save.",
+            font=ctk.CTkFont(size=12), text_color=THEME_COLORS["text_secondary"]
         ).pack(anchor="w", pady=(0, 6))
 
         self.setting_var_theme = ctk.StringVar(value=self.settings.get("theme", "Light"))
         self.seg_setting_theme = ctk.CTkSegmentedButton(
             box_theme, values=["Light", "Dark"],
             variable=self.setting_var_theme,
-            command=self._on_setting_theme_change,
             selected_color=THEME_COLORS["primary"],
             selected_hover_color=THEME_COLORS["primary_hover"],
             unselected_color=THEME_COLORS["card"],
             unselected_hover_color=THEME_COLORS["secondary_hover"],
-            text_color=THEME_COLORS["text_primary"]
+            text_color=THEME_COLORS["text_primary"],
+            font=ctk.CTkFont(size=12, weight="bold")
         )
         self.seg_setting_theme.pack(fill="x")
 
@@ -1272,12 +1283,12 @@ class ExpedUPApp(ctk.CTk):
         box_depth.grid(row=0, column=1, sticky="nsew", padx=(10, 0))
         ctk.CTkLabel(
             box_depth, text="Default Reconnaissance Depth",
-            font=ctk.CTkFont(size=11, weight="bold"),
+            font=ctk.CTkFont(size=13, weight="bold"),
             text_color=THEME_COLORS["text_primary"]
         ).pack(anchor="w", pady=(0, 4))
         ctk.CTkLabel(
-            box_depth, text="Standard performs fast single-index scan; Deep engages Bing & cross-engines.",
-            font=ctk.CTkFont(size=10), text_color=THEME_COLORS["text_secondary"]
+            box_depth, text="Standard performs fast single-index scan; Deep engages Bing & cross-engines. Applies upon Save.",
+            font=ctk.CTkFont(size=12), text_color=THEME_COLORS["text_secondary"]
         ).pack(anchor="w", pady=(0, 6))
 
         self.setting_var_depth = ctk.StringVar(value=self.settings.get("default_depth", "Deep (Multi-Engine)"))
@@ -1288,9 +1299,36 @@ class ExpedUPApp(ctk.CTk):
             selected_hover_color=THEME_COLORS["primary_hover"],
             unselected_color=THEME_COLORS["card"],
             unselected_hover_color=THEME_COLORS["secondary_hover"],
-            text_color=THEME_COLORS["text_primary"]
+            text_color=THEME_COLORS["text_primary"],
+            font=ctk.CTkFont(size=12, weight="bold")
         )
         self.seg_setting_depth.pack(fill="x")
+
+        # Row 1: UI Text & Font Scale selection
+        box_scale = ctk.CTkFrame(grid_gen, fg_color="transparent")
+        box_scale.grid(row=1, column=0, columnspan=2, sticky="nsew", pady=(14, 0))
+        ctk.CTkLabel(
+            box_scale, text="Application Text & Font Scale",
+            font=ctk.CTkFont(size=13, weight="bold"),
+            text_color=THEME_COLORS["text_primary"]
+        ).pack(anchor="w", pady=(0, 4))
+        ctk.CTkLabel(
+            box_scale, text="Adjust overall typography scale for maximum legibility across displays (Default: Large 110%). Applies upon Save.",
+            font=ctk.CTkFont(size=12), text_color=THEME_COLORS["text_secondary"]
+        ).pack(anchor="w", pady=(0, 6))
+
+        self.setting_var_text_size = ctk.StringVar(value=self.settings.get("text_size", "Large (110%)"))
+        self.seg_setting_text_size = ctk.CTkSegmentedButton(
+            box_scale, values=["Normal (100%)", "Large (110%)", "Extra Large (120%)"],
+            variable=self.setting_var_text_size,
+            selected_color=THEME_COLORS["primary"],
+            selected_hover_color=THEME_COLORS["primary_hover"],
+            unselected_color=THEME_COLORS["card"],
+            unselected_hover_color=THEME_COLORS["secondary_hover"],
+            text_color=THEME_COLORS["text_primary"],
+            font=ctk.CTkFont(size=12, weight="bold")
+        )
+        self.seg_setting_text_size.pack(fill="x")
 
         # ---------------------------------------------------------------------
         # 2. Dossier Storage & Auto-Export Card
@@ -1313,13 +1351,13 @@ class ExpedUPApp(ctk.CTk):
         ).pack(side="left", padx=(0, 6))
         ctk.CTkLabel(
             sec_header2, text="DOSSIER STORAGE & AUTO-EXPORT",
-            font=ctk.CTkFont(size=12, weight="bold"),
+            font=ctk.CTkFont(size=13, weight="bold"),
             text_color=THEME_COLORS["primary"]
         ).pack(side="left")
 
         ctk.CTkLabel(
             inner_storage, text="Default Export Directory",
-            font=ctk.CTkFont(size=11, weight="bold"),
+            font=ctk.CTkFont(size=12, weight="bold"),
             text_color=THEME_COLORS["text_primary"]
         ).pack(anchor="w")
 
@@ -1331,7 +1369,8 @@ class ExpedUPApp(ctk.CTk):
             dir_row, textvariable=self.setting_var_export_dir,
             height=34, fg_color=THEME_COLORS["input_bg"],
             border_color=THEME_COLORS["border"],
-            text_color=THEME_COLORS["text_primary"]
+            text_color=THEME_COLORS["text_primary"],
+            font=ctk.CTkFont(size=12)
         )
         self.entry_setting_export_dir.pack(side="left", fill="x", expand=True, padx=(0, 8))
 
@@ -1345,7 +1384,7 @@ class ExpedUPApp(ctk.CTk):
             hover_color=THEME_COLORS["secondary_hover"],
             text_color=THEME_COLORS["secondary_text"],
             border_width=1, border_color=THEME_COLORS["border"],
-            font=ctk.CTkFont(size=11)
+            font=ctk.CTkFont(size=12)
         ).pack(side="right")
 
         # Auto-export toggle
@@ -1354,7 +1393,7 @@ class ExpedUPApp(ctk.CTk):
             inner_storage,
             text="Automatically export full dossier suite (Markdown, CSV, JSON) upon expedition completion",
             variable=self.setting_var_auto_export,
-            font=ctk.CTkFont(size=11),
+            font=ctk.CTkFont(size=12),
             progress_color=THEME_COLORS["primary"]
         )
         self.switch_setting_auto_export.pack(anchor="w", pady=(2, 0))
@@ -1380,7 +1419,7 @@ class ExpedUPApp(ctk.CTk):
         ).pack(side="left", padx=(0, 6))
         ctk.CTkLabel(
             sec_header3, text="STEALTH, NETWORK & EVASION",
-            font=ctk.CTkFont(size=12, weight="bold"),
+            font=ctk.CTkFont(size=13, weight="bold"),
             text_color=THEME_COLORS["primary"]
         ).pack(side="left")
 
@@ -1395,12 +1434,12 @@ class ExpedUPApp(ctk.CTk):
         lbl_to_row.pack(fill="x")
         ctk.CTkLabel(
             lbl_to_row, text="Request Timeout",
-            font=ctk.CTkFont(size=11, weight="bold"),
+            font=ctk.CTkFont(size=12, weight="bold"),
             text_color=THEME_COLORS["text_primary"]
         ).pack(side="left")
         self.lbl_timeout_val = ctk.CTkLabel(
             lbl_to_row, text=f"{int(self.settings.get('request_timeout', 12))}s",
-            font=ctk.CTkFont(size=11, weight="bold"),
+            font=ctk.CTkFont(size=12, weight="bold"),
             text_color=THEME_COLORS["primary"]
         )
         self.lbl_timeout_val.pack(side="right")
@@ -1422,12 +1461,12 @@ class ExpedUPApp(ctk.CTk):
         lbl_min_row.pack(fill="x")
         ctk.CTkLabel(
             lbl_min_row, text="Min Query Delay",
-            font=ctk.CTkFont(size=11, weight="bold"),
+            font=ctk.CTkFont(size=12, weight="bold"),
             text_color=THEME_COLORS["text_primary"]
         ).pack(side="left")
         self.lbl_min_delay_val = ctk.CTkLabel(
             lbl_min_row, text=f"{float(self.settings.get('min_delay', 0.8)):.1f}s",
-            font=ctk.CTkFont(size=11, weight="bold"),
+            font=ctk.CTkFont(size=12, weight="bold"),
             text_color=THEME_COLORS["primary"]
         )
         self.lbl_min_delay_val.pack(side="right")
@@ -1449,12 +1488,12 @@ class ExpedUPApp(ctk.CTk):
         lbl_max_row.pack(fill="x")
         ctk.CTkLabel(
             lbl_max_row, text="Max Query Delay",
-            font=ctk.CTkFont(size=11, weight="bold"),
+            font=ctk.CTkFont(size=12, weight="bold"),
             text_color=THEME_COLORS["text_primary"]
         ).pack(side="left")
         self.lbl_max_delay_val = ctk.CTkLabel(
             lbl_max_row, text=f"{float(self.settings.get('max_delay', 1.4)):.1f}s",
-            font=ctk.CTkFont(size=11, weight="bold"),
+            font=ctk.CTkFont(size=12, weight="bold"),
             text_color=THEME_COLORS["primary"]
         )
         self.lbl_max_delay_val.pack(side="right")
@@ -1475,7 +1514,7 @@ class ExpedUPApp(ctk.CTk):
             inner_stealth,
             text="Rotate modern browser User-Agent fingerprints per probe to minimize anti-bot triggers",
             variable=self.setting_var_ua_rotation,
-            font=ctk.CTkFont(size=11),
+            font=ctk.CTkFont(size=12),
             progress_color=THEME_COLORS["primary"]
         )
         self.switch_setting_ua_rotation.pack(anchor="w", pady=(8, 0))
@@ -1504,7 +1543,7 @@ class ExpedUPApp(ctk.CTk):
         ).pack(side="left", padx=(0, 6))
         ctk.CTkLabel(
             left_hdr4, text="SOCIAL & IDENTITY PLATFORM MATRIX",
-            font=ctk.CTkFont(size=12, weight="bold"),
+            font=ctk.CTkFont(size=13, weight="bold"),
             text_color=THEME_COLORS["primary"]
         ).pack(side="left")
 
@@ -1514,7 +1553,7 @@ class ExpedUPApp(ctk.CTk):
         ctk.CTkButton(
             right_hdr4, text="Select All", width=74, height=24,
             command=self._select_all_platforms,
-            font=ctk.CTkFont(size=10),
+            font=ctk.CTkFont(size=11),
             fg_color=THEME_COLORS["secondary"],
             hover_color=THEME_COLORS["secondary_hover"],
             text_color=THEME_COLORS["secondary_text"],
@@ -1524,7 +1563,7 @@ class ExpedUPApp(ctk.CTk):
         ctk.CTkButton(
             right_hdr4, text="Deselect All", width=74, height=24,
             command=self._deselect_all_platforms,
-            font=ctk.CTkFont(size=10),
+            font=ctk.CTkFont(size=11),
             fg_color=THEME_COLORS["secondary"],
             hover_color=THEME_COLORS["secondary_hover"],
             text_color=THEME_COLORS["secondary_text"],
@@ -1534,7 +1573,7 @@ class ExpedUPApp(ctk.CTk):
         ctk.CTkLabel(
             inner_platforms,
             text=f"Target platforms probed for identity existence and OpenGraph metadata ({len(SOCIAL_PLATFORMS)} available).",
-            font=ctk.CTkFont(size=10), text_color=THEME_COLORS["text_secondary"]
+            font=ctk.CTkFont(size=11), text_color=THEME_COLORS["text_secondary"]
         ).pack(anchor="w", pady=(0, 10))
 
         # Checkbox matrix (3 columns)
@@ -1559,7 +1598,7 @@ class ExpedUPApp(ctk.CTk):
                 grid_plats,
                 text=f"{pname} ({pcat})",
                 variable=var,
-                font=ctk.CTkFont(size=11),
+                font=ctk.CTkFont(size=12),
                 text_color=THEME_COLORS["text_primary"],
                 checkmark_color="#ffffff",
                 fg_color=THEME_COLORS["primary"],
@@ -1589,14 +1628,14 @@ class ExpedUPApp(ctk.CTk):
         ).pack(side="left", padx=(0, 6))
         ctk.CTkLabel(
             sec_header5, text="DOMAIN & DNS RECONNAISSANCE EXTENSIONS (TLDs)",
-            font=ctk.CTkFont(size=12, weight="bold"),
+            font=ctk.CTkFont(size=13, weight="bold"),
             text_color=THEME_COLORS["primary"]
         ).pack(side="left")
 
         ctk.CTkLabel(
             inner_tlds,
             text="Comma-separated Top-Level Domains (TLDs) to probe for target name registration and web presence.",
-            font=ctk.CTkFont(size=10), text_color=THEME_COLORS["text_secondary"]
+            font=ctk.CTkFont(size=11), text_color=THEME_COLORS["text_secondary"]
         ).pack(anchor="w", pady=(0, 6))
 
         tld_list = self.settings.get("domain_tlds", DOMAIN_TLDS)
@@ -1605,7 +1644,8 @@ class ExpedUPApp(ctk.CTk):
             inner_tlds, textvariable=self.setting_var_tlds,
             height=34, fg_color=THEME_COLORS["input_bg"],
             border_color=THEME_COLORS["border"],
-            text_color=THEME_COLORS["text_primary"]
+            text_color=THEME_COLORS["text_primary"],
+            font=ctk.CTkFont(size=12)
         )
         self.entry_setting_tlds.pack(fill="x", pady=(0, 4))
 
@@ -1620,7 +1660,7 @@ class ExpedUPApp(ctk.CTk):
             image=self._get_icon("circle-check", (16, 16), "#ffffff"),
             compound="left",
             command=self._save_settings_action,
-            height=38, font=ctk.CTkFont(size=12, weight="bold"),
+            height=38, font=ctk.CTkFont(size=13, weight="bold"),
             fg_color=THEME_COLORS["primary"],
             hover_color=THEME_COLORS["primary_hover"],
             text_color="#ffffff"
@@ -1632,7 +1672,7 @@ class ExpedUPApp(ctk.CTk):
             image=self._get_icon("refresh", (14, 14), THEME_COLORS["secondary_text"]),
             compound="left",
             command=self._reset_settings_action,
-            height=38, font=ctk.CTkFont(size=11),
+            height=38, font=ctk.CTkFont(size=12),
             fg_color=THEME_COLORS["secondary"],
             hover_color=THEME_COLORS["secondary_hover"],
             text_color=THEME_COLORS["secondary_text"],
@@ -1643,7 +1683,7 @@ class ExpedUPApp(ctk.CTk):
         # Toast status message
         self.lbl_settings_toast = ctk.CTkLabel(
             scroll_settings, text="",
-            font=ctk.CTkFont(size=11, weight="bold"),
+            font=ctk.CTkFont(size=12, weight="bold"),
             text_color=THEME_COLORS["success"]
         )
         self.lbl_settings_toast.pack(fill="x", pady=(0, 10))
@@ -1665,15 +1705,6 @@ class ExpedUPApp(ctk.CTk):
         if self.slider_min_delay.get() > val:
             self.slider_min_delay.set(val)
             self.lbl_min_delay_val.configure(text=f"{float(val):.1f}s")
-
-    def _on_setting_theme_change(self, val):
-        ctk.set_appearance_mode(val)
-        if val == "Dark":
-            self.appearance_switch.select()
-            self.appearance_switch.configure(text="Dark Mode")
-        else:
-            self.appearance_switch.deselect()
-            self.appearance_switch.configure(text="Light Mode")
 
     def _select_all_platforms(self):
         for var in self.setting_platform_vars.values():
@@ -1713,6 +1744,7 @@ class ExpedUPApp(ctk.CTk):
 
             payload = {
                 "theme": self.setting_var_theme.get(),
+                "text_size": self.setting_var_text_size.get(),
                 "default_depth": self.setting_var_depth.get(),
                 "export_dir": self.setting_var_export_dir.get().strip() or DEFAULT_EXPORT_DIR,
                 "auto_export_all": bool(self.setting_var_auto_export.get()),
@@ -1726,7 +1758,7 @@ class ExpedUPApp(ctk.CTk):
 
             self.settings = save_settings(payload)
 
-            # Apply theme immediately
+            # Apply theme upon explicit save
             ctk.set_appearance_mode(payload["theme"])
             if payload["theme"] == "Dark":
                 self.appearance_switch.select()
@@ -1734,6 +1766,10 @@ class ExpedUPApp(ctk.CTk):
             else:
                 self.appearance_switch.deselect()
                 self.appearance_switch.configure(text="Light Mode")
+
+            # Apply UI Text & Font Scale upon explicit save
+            scale_val = TEXT_SCALE_MAP.get(payload.get("text_size", "Large (110%)"), 1.1)
+            ctk.set_widget_scaling(scale_val)
 
             # Apply default depth
             self.seg_depth.set(payload["default_depth"])
@@ -1761,6 +1797,8 @@ class ExpedUPApp(ctk.CTk):
             self.seg_setting_theme.set(self.settings["theme"])
             self.setting_var_depth.set(self.settings["default_depth"])
             self.seg_setting_depth.set(self.settings["default_depth"])
+            self.setting_var_text_size.set(self.settings["text_size"])
+            self.seg_setting_text_size.set(self.settings["text_size"])
             self.setting_var_export_dir.set(self.settings["export_dir"])
             self.entry_setting_export_dir.delete(0, "end")
             self.entry_setting_export_dir.insert(0, self.settings["export_dir"])
@@ -1782,7 +1820,7 @@ class ExpedUPApp(ctk.CTk):
 
             self.setting_var_tlds.set(", ".join(self.settings["domain_tlds"]))
 
-            # Apply theme and depth to app
+            # Apply theme, scaling, and depth to app
             ctk.set_appearance_mode(self.settings["theme"])
             if self.settings["theme"] == "Dark":
                 self.appearance_switch.select()
@@ -1790,6 +1828,9 @@ class ExpedUPApp(ctk.CTk):
             else:
                 self.appearance_switch.deselect()
                 self.appearance_switch.configure(text="Light Mode")
+
+            scale_val = TEXT_SCALE_MAP.get(self.settings.get("text_size", "Large (110%)"), 1.1)
+            ctk.set_widget_scaling(scale_val)
 
             self.seg_depth.set(self.settings["default_depth"])
 
@@ -2222,14 +2263,11 @@ class ExpedUPApp(ctk.CTk):
         ctk.set_appearance_mode(val)
         self.appearance_switch.configure(text="Dark Mode" if val == "Dark" else "Light Mode")
 
-        # Keep Settings Tab controls and persistent config in sync
+        # Keep Settings Tab staged controls in sync
         if hasattr(self, "setting_var_theme"):
             self.setting_var_theme.set(val)
         if hasattr(self, "seg_setting_theme"):
             self.seg_setting_theme.set(val)
-        if hasattr(self, "settings"):
-            self.settings["theme"] = val
-            save_settings(self.settings)
 
         self._on_log_message(f"[THEME] Interface appearance switched to: {val} Mode")
 

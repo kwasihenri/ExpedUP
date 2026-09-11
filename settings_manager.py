@@ -11,8 +11,15 @@ from config import SOCIAL_PLATFORMS, DOMAIN_TLDS, DEFAULT_EXPORT_DIR
 
 SETTINGS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "settings.json")
 
+TEXT_SCALE_MAP: Dict[str, float] = {
+    "Normal (100%)": 1.0,
+    "Large (110%)": 1.1,
+    "Extra Large (120%)": 1.2
+}
+
 DEFAULT_SETTINGS: Dict[str, Any] = {
     "theme": "Light",
+    "text_size": "Large (110%)",
     "default_depth": "Deep (Multi-Engine)",
     "export_dir": DEFAULT_EXPORT_DIR,
     "auto_export_all": False,
@@ -48,6 +55,9 @@ def save_settings(data: Dict[str, Any]) -> Dict[str, Any]:
     """Validate and write settings to disk."""
     clean_data = dict(DEFAULT_SETTINGS)
     clean_data.update(data)
+
+    if clean_data.get("text_size") not in TEXT_SCALE_MAP:
+        clean_data["text_size"] = "Large (110%)"
 
     # Sanitize numeric bounds
     try:
