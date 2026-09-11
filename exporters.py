@@ -84,14 +84,14 @@ def generate_markdown_dossier(data: Dict) -> str:
     md.append("### Phone Numbers")
     if phones:
         for p in phones:
-            md.append(f"- `📞 {p}`")
+            md.append(f"- Phone: `{p}`")
     else:
         md.append("_No phone numbers discovered._")
 
     md.append("\n### Email Addresses")
     if emails:
         for e in emails:
-            md.append(f"- `✉️ {e}`")
+            md.append(f"- Email: `{e}`")
     else:
         md.append("_No email addresses discovered._")
 
@@ -171,3 +171,29 @@ def export_csv_file(data: Dict, output_path: str) -> str:
             writer.writerow(["Email Address", e, "", "Discovered contact"])
 
     return output_path
+
+
+def export_all_formats(data: Dict, output_dir: str = "artifacts/expeditions") -> Dict[str, str]:
+    """Export expedition findings into Markdown, JSON, and CSV simultaneously."""
+    import re
+    import time
+
+    target = data.get("target", "Target")
+    clean_name = re.sub(r'[^a-zA-Z0-9_-]', '_', target).strip('_') or "expedition"
+    stamp = time.strftime("%Y%m%d_%H%M%S")
+    os.makedirs(output_dir, exist_ok=True)
+
+    md_path = os.path.join(output_dir, f"ExpedUP_{clean_name}_{stamp}.md")
+    json_path = os.path.join(output_dir, f"ExpedUP_{clean_name}_{stamp}.json")
+    csv_path = os.path.join(output_dir, f"ExpedUP_{clean_name}_{stamp}.csv")
+
+    export_markdown_file(data, md_path)
+    export_json_file(data, json_path)
+    export_csv_file(data, csv_path)
+
+    return {
+        "markdown": os.path.abspath(md_path),
+        "json": os.path.abspath(json_path),
+        "csv": os.path.abspath(csv_path)
+    }
+

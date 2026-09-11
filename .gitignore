@@ -40,3 +40,5 @@ env/
 exports/
 *.dossier.md
 *.results.json
+artifacts
+tools

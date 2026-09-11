@@ -72,33 +72,51 @@ class ExpedUPEngine:
     # ---------------------------------------------------------
     # 1. Search Engine Probing (DuckDuckGo Lite, Bing, Yahoo)
     # ---------------------------------------------------------
-    def search_duckduckgo_lite(self, query: str) -> List[dict]:
-        """Perform search query via DuckDuckGo Lite."""
+    def search_duckduckgo_html(self, query: str) -> List[dict]:
+        """Perform search query via DuckDuckGo HTML endpoint."""
         if self.stop_requested:
             return []
 
-        url = "https://lite.duckduckgo.com/lite/"
-        data = urllib.parse.urlencode({"q": query}).encode("utf-8")
-        req = urllib.request.Request(url, data=data, headers=self.get_headers())
+        url = f"https://html.duckduckgo.com/html/?q={urllib.parse.quote(query)}"
+        req = urllib.request.Request(url, headers=self.get_headers())
         results = []
 
         try:
             with urllib.request.urlopen(req, context=SSL_CTX, timeout=12) as resp:
                 html = resp.read().decode("utf-8", errors="ignore")
-                snippets = re.findall(r'<td class="result-snippet">(.*?)</td>', html, re.DOTALL)
-                links = re.findall(r'<a[^>]+class="result-link"[^>]+href="([^"]+)"[^>]*>(.*?)</a>', html, re.DOTALL)
 
-                for i in range(min(len(links), len(snippets))):
-                    href, title = links[i]
+                # Extract all titles & links
+                title_matches = re.findall(
+                    r'<a[^>]+class="[^"]*result__a[^"]*"[^>]+href="([^"]+)"[^>]*>(.*?)</a>',
+                    html, re.DOTALL | re.IGNORECASE
+                )
+                if not title_matches:
+                    title_matches = re.findall(
+                        r'<a[^>]+href="([^"]+)"[^>]+class="[^"]*result__a[^"]*"[^>]*>(.*?)</a>',
+                        html, re.DOTALL | re.IGNORECASE
+                    )
+
+                # Extract snippets
+                snippets = re.findall(
+                    r'<a[^>]+class="[^"]*result__snippet[^"]*"[^>]*>(.*?)</a>',
+                    html, re.DOTALL | re.IGNORECASE
+                )
+
+                limit = min(len(title_matches), len(snippets)) if snippets else len(title_matches)
+
+                for i in range(limit):
+                    href, raw_title = title_matches[i]
+                    raw_snip = snippets[i] if i < len(snippets) else ""
+
                     if "uddg=" in href:
                         m_u = re.search(r"uddg=([^&]+)", href)
                         if m_u:
                             href = urllib.parse.unquote(m_u.group(1))
-                    
-                    snip = re.sub(r"<[^>]+>", "", snippets[i]).strip()
-                    title = re.sub(r"<[^>]+>", "", title).strip()
 
-                    if href and not href.startswith("/"):
+                    title = re.sub(r"<[^>]+>", "", raw_title).strip()
+                    snip = re.sub(r"<[^>]+>", "", raw_snip).strip()
+
+                    if href and not href.startswith("/") and title:
                         item = {
                             "engine": "DuckDuckGo",
                             "query": query,
@@ -111,9 +129,11 @@ class ExpedUPEngine:
                         self.result_cb("search", item)
 
         except Exception as e:
-            self.log(f"DDG Lite error on '{query}': {e}")
+            self.log(f"DDG search notice on '{query}': {e}")
 
         return results
+
+
 
     def search_bing(self, query: str) -> List[dict]:
         """Perform search query via Bing."""
@@ -180,17 +200,17 @@ class ExpedUPEngine:
                 title = m_t.group(1).strip() if m_t else ""
 
                 # Extract OpenGraph tags
-                m_ot = re.search(r'<meta[^>]*property=["']og:title["'][^>]*content=["']([^"']*)["']', html, re.IGNORECASE)
+                m_ot = re.search(r'''<meta[^>]*property=["']og:title["'][^>]*content=["']([^"']*)["']''', html, re.IGNORECASE)
                 og_title = m_ot.group(1).strip() if m_ot else ""
 
-                m_od = re.search(r'<meta[^>]*property=["']og:description["'][^>]*content=["']([^"']*)["']', html, re.IGNORECASE)
+                m_od = re.search(r'''<meta[^>]*property=["']og:description["'][^>]*content=["']([^"']*)["']''', html, re.IGNORECASE)
                 og_desc = m_od.group(1).strip() if m_od else ""
 
-                m_oi = re.search(r'<meta[^>]*property=["']og:image["'][^>]*content=["']([^"']*)["']', html, re.IGNORECASE)
+                m_oi = re.search(r'''<meta[^>]*property=["']og:image["'][^>]*content=["']([^"']*)["']''', html, re.IGNORECASE)
                 og_image = m_oi.group(1).strip() if m_oi else ""
 
                 if not og_desc:
-                    m_d = re.search(r'<meta[^>]*name=["']description["'][^>]*content=["']([^"']*)["']', html, re.IGNORECASE)
+                    m_d = re.search(r'''<meta[^>]*name=["']description["'][^>]*content=["']([^"']*)["']''', html, re.IGNORECASE)
                     og_desc = m_d.group(1).strip() if m_d else ""
 
                 self.harvest_entities(f"{title} {og_title} {og_desc}")
@@ -266,39 +286,51 @@ class ExpedUPEngine:
     # 4. Intelligence & Entity Harvesting (Regex)
     # ---------------------------------------------------------
     def harvest_entities(self, text: str):
-        """Extract phone numbers, emails, mentions, and hashtags."""
+        """Extract phone numbers, emails, mentions, and hashtags with live callback."""
         if not text:
             return
 
-        # Phone numbers (international and regional formats)
+        # Phone numbers (international, local 10-digit, and regional formats)
         phones = re.findall(r'(?:\+?\d{1,3}[-\s.]?)?\(?\d{2,4}\)?[-\s.]?\d{3}[-\s.]?\d{3,4}', text)
         for p in phones:
             cleaned = re.sub(r'[^\d+]', '', p)
             if 8 <= len(cleaned) <= 15:
-                self.results["entities"]["phones"].add(p.strip())
+                p_str = p.strip()
+                if p_str not in self.results["entities"]["phones"]:
+                    self.results["entities"]["phones"].add(p_str)
+                    self.result_cb("entity", {"type": "phone", "value": p_str})
 
         # Emails
         emails = re.findall(r'[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+', text)
         for e in emails:
-            if not any(e.lower().endswith(x) for x in [".png", ".jpg", ".jpeg", ".webp"]):
-                self.results["entities"]["emails"].add(e.lower().strip())
+            if not any(e.lower().endswith(x) for x in [".png", ".jpg", ".jpeg", ".webp", ".gif", ".svg"]):
+                e_str = e.lower().strip()
+                if e_str not in self.results["entities"]["emails"]:
+                    self.results["entities"]["emails"].add(e_str)
+                    self.result_cb("entity", {"type": "email", "value": e_str})
 
         # Mentions (@handle)
         mentions = re.findall(r'@[a-zA-Z0-9_.-]{3,30}', text)
         for m in mentions:
-            self.results["entities"]["mentions"].add(m.strip())
+            m_str = m.strip()
+            if m_str not in self.results["entities"]["mentions"]:
+                self.results["entities"]["mentions"].add(m_str)
+                self.result_cb("entity", {"type": "mention", "value": m_str})
 
         # Hashtags (#hashtag)
         hashtags = re.findall(r'#[a-zA-Z0-9_]{3,35}', text)
         for h in hashtags:
-            self.results["entities"]["hashtags"].add(h.strip())
+            h_str = h.strip()
+            if h_str not in self.results["entities"]["hashtags"]:
+                self.results["entities"]["hashtags"].add(h_str)
+                self.result_cb("entity", {"type": "hashtag", "value": h_str})
 
     # ---------------------------------------------------------
     # 5. Master Expedition Runner
     # ---------------------------------------------------------
     def run_expedition(self, target: str, location: str = "", category: str = "",
                        phone: str = "", deep_level: str = "Standard") -> dict:
-        """Run the complete multi-source expedition pipeline."""
+        """Run the complete multi-source intelligence expedition pipeline."""
         self.stop_requested = False
         start_time = time.time()
         self.results["target"] = target
@@ -315,21 +347,32 @@ class ExpedUPEngine:
         if phone:
             self.log(f"Contact anchor: {phone}")
 
-        # Build query matrix
+        # Build comprehensive multi-axis query matrix
         queries = [
             target,
             f'"{target}"'
         ]
         if location:
             queries.extend([f"{target} {location}", f'"{target}" "{location}"'])
+            for loc_part in location.split(","):
+                part = loc_part.strip()
+                if part and f'"{target}" {part}' not in queries:
+                    queries.append(f'"{target}" {part}')
+
         if category:
             queries.extend([f"{target} {category}", f'"{target}" {category}'])
+            for cat_word in category.replace("&", " ").split():
+                w = cat_word.strip()
+                if len(w) > 3 and f'"{target}" {w}' not in queries:
+                    queries.append(f'"{target}" {w}')
+
         if phone:
             queries.extend([f'"{phone}"', f"{target} {phone}"])
 
-        # Social dorks
+        # Social dorks & platform discovery
         queries.extend([
             f'site:instagram.com "{target}"',
+            f'site:threads.net "{target}"',
             f'site:tiktok.com "{target}"',
             f'site:facebook.com "{target}"',
             f'site:linkedin.com "{target}"'
@@ -344,17 +387,17 @@ class ExpedUPEngine:
             if self.stop_requested:
                 break
             current_step += 1
-            self.progress_cb(current_step, total_steps, f"Searching: {q[:30]}...")
+            self.progress_cb(current_step, total_steps, f"Searching: {q[:32]}...")
             self.log(f"Probing search index: {q}")
 
-            ddg_res = self.search_duckduckgo_lite(q)
+            ddg_res = self.search_duckduckgo_html(q)
             self.results["search_results"].extend(ddg_res)
-            time.sleep(random.uniform(1.0, 1.8))
+            time.sleep(random.uniform(0.8, 1.4))
 
             if deep_level == "Deep":
                 bing_res = self.search_bing(q)
                 self.results["search_results"].extend(bing_res)
-                time.sleep(random.uniform(1.0, 1.5))
+                time.sleep(random.uniform(0.6, 1.2))
 
         # Deduplicate search results
         seen_urls = set()
