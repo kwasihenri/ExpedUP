@@ -117,6 +117,12 @@ def synthesize_intelligence(target: str, results: Dict[str, Any]) -> Dict[str, A
             if re.search(reg_pat, all_text, re.IGNORECASE):
                 detected_locations.add(reg_name)
 
+        # Extract specific physical address/landmark if found in bio or text
+        m_landmark = re.search(r'([A-Za-z]+,\s*(?:adjacent|opposite|behind|near|next to)\s+[A-Za-z0-9\s]+)', all_text, re.IGNORECASE)
+        if m_landmark:
+            landmark_text = m_landmark.group(1).strip().title()
+            detected_locations.add(landmark_text)
+
         operating_base = ", ".join(sorted(detected_locations)) if detected_locations else "Global / Digital Operations"
 
         # Mobility model
@@ -130,9 +136,9 @@ def synthesize_intelligence(target: str, results: Dict[str, Any]) -> Dict[str, A
             detected_industries.add(results.get("category").strip())
 
         industry_keywords = [
-            ("Bridal & Event Makeup", r'\b(?:makeup|make-up|bridal|bride|brides|glam|beauty\s*artist)\b|#\w*(?:makeup|bride|bridal|glam)\w*'),
+            ("Bridal & Event Makeup", r'\b(?:makeup|make-up|bridal|bride|brides|glam|beauty\s*artist|makeup\s*artistry)\b|#\w*(?:makeup|bride|bridal|glam)\w*'),
             ("Custom Wig Making & Hair Extensions", r'\b(?:wig|wigs|wigcap|wig\s+cap|lace\s*frontal|bone\s*straight|hairstylist|hairstyling|hair\s*styling|hair\s*revamp|frontal)\b|#\w*(?:wig|hair|frontal)\w*'),
-            ("Professional Vocational Training", r'\b(?:trainer|training|masterclass|apprenticeship|academy)\b|#\w*(?:trainer|training|masterclass)\w*'),
+            ("Professional Vocational Training", r'\b(?:trainer|training|masterclass|apprenticeship|academy|educator|beauty\s*educator)\b|#\w*(?:trainer|training|masterclass|educator)\w*'),
             ("Fashion, Apparel & Styling", r'\b(?:clothing|fashion|boutique|wardrobe|apparel)\b|#\w*fashion\w*'),
             ("Software & Digital Technology", r'\b(?:software|tech|developer|digital|api|saas|app)\b'),
             ("E-Commerce & Retail", r'\b(?:e-commerce|store|shop|online\s*store|retail)\b')
@@ -313,18 +319,85 @@ def synthesize_intelligence(target: str, results: Dict[str, Any]) -> Dict[str, A
     registered_dom_count = len(registered_domains)
     dom_claimed_pct = round((registered_dom_count / max(1, total_domains)) * 100, 1)
 
-    # Calculate overall clearance score (100 = completely free, 0 = fully occupied)
-    uniqueness_score = max(0, min(100, 100 - int((social_claimed_pct * 0.6) + (dom_claimed_pct * 0.4))))
+    # -------------------------------------------------------------------------
+    # Multi-Dimensional Collision & Clearance Scoring Model:
+    # A virgin name (like 'waitrive') with 0 web hits, 0 socials, 0 domains, 0 contacts -> 100/100 (Pristine).
+    # An active real-world operating brand (like 'luuksgh') with dozens of indexed search hits,
+    # active Tier-1 socials (Instagram, TikTok), verified contact numbers, and physical operations
+    # must score as HIGH COLLISION RISK (~5 to 20/100).
+    # -------------------------------------------------------------------------
+
+    # 1. Search Engine Footprint Collision (Weight: up to 35 pts)
+    search_count = len(search_results)
+    if search_count == 0:
+        search_collision = 0
+    elif search_count <= 2:
+        search_collision = 8
+    elif search_count <= 6:
+        search_collision = 16
+    elif search_count <= 15:
+        search_collision = 24
+    elif search_count <= 30:
+        search_collision = 30
+    else:
+        search_collision = 35  # Established online search footprint (e.g. 70+ results)
+
+    # 2. Social Handle Collision (Weight: up to 40 pts)
+    # Tier-1 creator/commercial platforms have higher collision impact than niche sites
+    tier1_names = {"instagram", "tiktok", "twitter / x", "facebook", "youtube", "linkedin company", "threads"}
+    tier1_active = [p for p in active_socials if p.get("platform", "").lower() in tier1_names]
+    other_active = [p for p in active_socials if p.get("platform", "").lower() not in tier1_names]
+
+    if not tier1_active and not other_active:
+        social_collision = 0
+    else:
+        if len(tier1_active) == 1:
+            tier1_pts = 20
+        elif len(tier1_active) == 2:
+            tier1_pts = 32
+        elif len(tier1_active) >= 3:
+            tier1_pts = 40
+        else:
+            tier1_pts = 0
+
+        other_pts = len(other_active) * 5
+        social_collision = min(40, tier1_pts + other_pts)
+
+    # 3. Active Commercial Operations & Direct Contact Collision (Weight: up to 25 pts)
+    commercial_collision = 0
+    if phones:
+        commercial_collision += 15  # Active trading business with direct public phone/WhatsApp lines
+    if emails:
+        commercial_collision += 5
+    if operating_base and "unclaimed" not in operating_base.lower() and "pristine" not in operating_base.lower() and operating_base != "Global / Digital Operations":
+        commercial_collision += 5
+    commercial_collision = min(25, commercial_collision)
+
+    # 4. Domain Name Space Collision (Weight: up to 20 pts)
+    domain_collision = 0
+    has_com = any(d.get("domain", "").endswith(".com") and d.get("is_registered") for d in registered_domains)
+    if has_com:
+        domain_collision += 14
+        other_doms = len(registered_domains) - 1
+        domain_collision += min(6, max(0, other_doms) * 2)
+    else:
+        domain_collision += min(20, len(registered_domains) * 4)
+
+    # Total Collision Penalty (0 to 100)
+    total_collision_penalty = min(100, search_collision + social_collision + commercial_collision + domain_collision)
+    uniqueness_score = max(0, min(100, 100 - total_collision_penalty))
 
     if uniqueness_score >= 80:
         clearance_rating = "HIGHLY AVAILABLE / CLEAN BRAND IDENTITY"
-        clearance_verdict = f"'{target}' is largely unclaimed across major social platforms and domain registries. Excellent candidate for brand registration."
+        clearance_verdict = f"'{target}' is largely unclaimed across major web search indexes, social platforms, and domain registries. Pristine candidate for brand registration."
     elif uniqueness_score >= 50:
         clearance_rating = "MODERATE CLEARANCE / PARTIALLY CONTESTED"
-        clearance_verdict = f"'{target}' has existing claims on some social platforms or domain extensions, but is available on others. Action required to secure remaining handles."
+        occupied_names = ", ".join([p["platform"] for p in active_socials]) or "partial web traces"
+        clearance_verdict = f"'{target}' has existing claims on {occupied_names}, but remains available across other channels. Action required to secure remaining namespace or evaluate trademark."
     else:
         clearance_rating = "HIGH COLLISION RISK / ESTABLISHED BRAND EXISTS"
-        clearance_verdict = f"'{target}' is actively occupied by an established business/creator with active digital footprint and audience. High risk of brand confusion or trademark conflict."
+        occupied_names = ", ".join([p["platform"] for p in active_socials]) or "multiple web channels"
+        clearance_verdict = f"'{target}' is actively occupied by an established entity with {search_count} indexed web citations, active presence on {occupied_names}, and direct commercial contact channels. High risk of brand collision or trademark conflict."
 
     # Generate clean alternative variations
     variations = [
@@ -336,7 +409,7 @@ def synthesize_intelligence(target: str, results: Dict[str, Any]) -> Dict[str, A
         f"{clean_target}studio",
         f"{clean_target}hub"
     ]
-    if any("makeup" in ind.lower() or "wig" in ind.lower() for ind in detected_industries):
+    if any("makeup" in ind.lower() or "wig" in ind.lower() or "beauty" in ind.lower() for ind in detected_industries):
         variations.extend([f"{clean_target}beauty", f"{clean_target}hair", f"{clean_target}glam"])
 
     brand_clearance = {
@@ -346,6 +419,10 @@ def synthesize_intelligence(target: str, results: Dict[str, Any]) -> Dict[str, A
         "verdict": clearance_verdict,
         "handle_collision_rate": f"{social_claimed_pct}% ({social_claimed_count}/{total_socials} platforms occupied)",
         "domain_collision_rate": f"{dom_claimed_pct}% ({registered_dom_count}/{total_domains} TLDs registered)",
+        "search_collision_impact": f"{search_collision}/35 pts ({search_count} indexed web entries)",
+        "social_collision_impact": f"{social_collision}/40 pts ({len(active_socials)} active channels: {', '.join([p['platform'] for p in active_socials]) or 'None'})",
+        "commercial_collision_impact": f"{commercial_collision}/25 pts ({len(phones)} phone(s), base: {operating_base})",
+        "domain_collision_impact": f"{domain_collision}/20 pts ({len(registered_domains)} registered TLDs)",
         "occupied_platforms": [p["platform"] for p in active_socials],
         "free_platforms": [p["platform"] for p in social_profiles if not p.get("exists")],
         "registered_domains": [d["domain"] for d in registered_domains],

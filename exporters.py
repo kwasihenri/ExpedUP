@@ -61,7 +61,13 @@ def generate_markdown_dossier(data: Dict[str, Any]) -> str:
     md.append(f"| **Active Social Channels** | {len(social_res)} verified profiles |")
     md.append(f"| **Registered Web Domains** | {len(domains)} active TLDs |")
     md.append(f"| **Web Search Discoveries** | {len(search_res)} indexed entries |")
-    md.append(f"| **Identified Contacts** | {len(phones)} phone(s), {len(emails)} email(s) |\n")
+    md.append(f"| **Identified Contacts** | {len(phones)} phone(s), {len(emails)} email(s) |")
+    if bc.get("search_collision_impact"):
+        md.append(f"| **Web Footprint Collision** | `{bc.get('search_collision_impact')}` |")
+        md.append(f"| **Social Collision Impact** | `{bc.get('social_collision_impact')}` |")
+        md.append(f"| **Commercial Identity Collision** | `{bc.get('commercial_collision_impact')}` |")
+        md.append(f"| **Domain Namespace Collision** | `{bc.get('domain_collision_impact')}` |")
+    md.append("\n")
 
     # Section 2: Business Profile & Operational Model (Use Case 1)
     md.append("---")

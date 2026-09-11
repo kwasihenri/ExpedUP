@@ -44,10 +44,10 @@ def run_cli(args):
     print("-" * 65)
 
     def log_cb(msg):
-        print(msg)
+        print(msg, flush=True)
 
     def progress_cb(curr, tot, desc):
-        print(f"[{curr}/{tot}] {desc}")
+        print(f"[{curr}/{tot}] {desc}", flush=True)
 
     engine = ExpedUPEngine(log_cb=log_cb, progress_cb=progress_cb)
     results = engine.run_expedition(

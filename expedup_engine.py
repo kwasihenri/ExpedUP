@@ -24,7 +24,7 @@ SSL_CTX.verify_mode = ssl.CERT_NONE
 def is_search_result_relevant(target: str, title: str, snippet: str, url: str, strict: bool = False) -> bool:
     """
     Verify that a search result is genuinely related to the target keyword,
-    filtering out engine fallback/trending links (e.g. iLovePDF when zero hits are found).
+    filtering out engine fallback/trending links and accidental substring collisions.
     """
     if not target:
         return True
@@ -36,21 +36,24 @@ def is_search_result_relevant(target: str, title: str, snippet: str, url: str, s
     combined_text = f"{title} {snippet}".lower()
     url_lower = url.lower()
 
-    if strict:
-        # In strict mode, require exact word boundary match in title/snippet or exact slug in URL
-        word_pat = rf'\b{re.escape(clean_target)}\b'
-        if re.search(word_pat, combined_text):
-            return True
-        if clean_target in url_lower:
-            return True
-        return False
-    else:
-        # Standard mode: target or clean_target appears anywhere in title, snippet, or URL
-        if target.lower() in combined_text or clean_target in combined_text:
-            return True
-        if clean_target in url_lower:
-            return True
-        return False
+    # 1. Target appears as an explicit word boundary in title or snippet
+    word_pat = rf'\b{re.escape(clean_target)}\b'
+    if re.search(word_pat, combined_text) or target.lower() in combined_text:
+        return True
+
+    # 2. Target is the dedicated second-level domain (e.g. waitrive.com, luuksgh.org)
+    domain_pat = rf'(?:^|https?://(?:[a-z0-9-]+\.)?){re.escape(clean_target)}\.[a-z]{{2,}}'
+    if re.search(domain_pat, url_lower):
+        return True
+
+    # 3. Target is the primary user handle or route slug in the path
+    # e.g. /luuksgh/ or /@luuksgh or /user/luuksgh or /company/luuksgh
+    # Excludes random hyphenated blog slugs like '...cant-waitrive/123'
+    slug_pat = rf'/(?:@|company/|in/|pages?/|user/)?{re.escape(clean_target)}(?:/|$|\.|\?)'
+    if re.search(slug_pat, url_lower):
+        return True
+
+    return False
 
 
 class ExpedUPEngine:
@@ -263,6 +266,9 @@ class ExpedUPEngine:
         og_image = ""
         html = ""
 
+        tiktok_user_found = False
+        not_found_explicit = False
+
         try:
             with urllib.request.urlopen(req, context=SSL_CTX, timeout=self.timeout) as resp:
                 status = resp.getcode()
@@ -286,6 +292,35 @@ class ExpedUPEngine:
                     m_d = re.search(r'''<meta[^>]*name=["']description["'][^>]*content=["']([^"']*)["']''', html, re.IGNORECASE)
                     og_desc = m_d.group(1).strip() if m_d else ""
 
+                # Dedicated TikTok profile rehydration data parsing
+                if "tiktok" in platform["name"].lower() and html:
+                    m_tt = re.search(r'<script id="__UNIVERSAL_DATA_FOR_REHYDRATION__"[^>]*>(.*?)</script>', html, re.DOTALL)
+                    if m_tt:
+                        try:
+                            tt_data = json.loads(m_tt.group(1))
+                            user_detail = tt_data.get("__DEFAULT_SCOPE__", {}).get("webapp.user-detail", {})
+                            user_info = user_detail.get("userInfo", {})
+                            user_obj = user_info.get("user", {})
+                            stats_obj = user_info.get("stats", {})
+                            status_code = user_detail.get("statusCode", -1)
+                            if user_obj and user_obj.get("uniqueId") and status_code == 0:
+                                tiktok_user_found = True
+                                unique_id = user_obj.get("uniqueId")
+                                nickname = user_obj.get("nickname") or unique_id
+                                sig = user_obj.get("signature", "")
+                                followers = stats_obj.get("followerCount", 0)
+                                title = f"{nickname} (@{unique_id}) on TikTok"
+                                og_title = title
+                                if sig:
+                                    og_desc = sig
+                                    self.harvest_entities(sig)
+                                elif followers:
+                                    og_desc = f"{nickname} on TikTok with {followers:,} followers."
+                            elif status_code in [10221, 10222] or (not user_obj and status_code != 0):
+                                not_found_explicit = True
+                        except Exception:
+                            pass
+
                 self.harvest_entities(f"{title} {og_title} {og_desc}")
 
         except urllib.error.HTTPError as e:
@@ -299,9 +334,16 @@ class ExpedUPEngine:
         matched_search_url = False
         plat_domain = urllib.parse.urlparse(url).netloc.replace("www.", "")
 
+        # Target must be the actual account handle on this platform
+        # e.g. facebook.com/luuksgh, instagram.com/luuksgh, tiktok.com/@luuksgh, youtube.com/@luuksgh
+        profile_url_pat = rf'https?://(?:[a-z0-9-]+\.)?{re.escape(plat_domain)}/(?:@|company/|in/|pages?/|user/)?{re.escape(clean_target)}(?:/|$|\?)'
+
         for s_res in self.results.get("search_results", []):
             s_url = s_res.get("url", "")
-            if plat_domain in s_url and clean_target in s_url.lower():
+            is_plat_profile = bool(re.search(profile_url_pat, s_url, re.IGNORECASE))
+            has_mention_in_snip = (plat_domain in s_url and bool(re.search(rf'@{re.escape(clean_target)}\b', f"{s_res.get('title', '')} {s_res.get('snippet', '')}", re.IGNORECASE)))
+
+            if is_plat_profile or has_mention_in_snip:
                 matched_search_url = True
                 snip = s_res.get("snippet", "")
                 if snip and len(snip) > len(snippet_bio):
@@ -323,7 +365,9 @@ class ExpedUPEngine:
             if title_lower in ["threads", "log in • threads", "login • threads", "threads • log in"] or "log in" in title_lower or title_lower == "threads":
                 is_generic_title = True
         elif "tiktok" in plat_key:
-            if "make your day" in title_lower or title_lower in ["tiktok", "tiktok - make your day"]:
+            if tiktok_user_found:
+                is_generic_title = False
+            elif "make your day" in title_lower or title_lower in ["tiktok", "tiktok - make your day"]:
                 is_generic_title = True
         elif "reddit" in plat_key:
             if title_lower in ["reddit", "reddit - dive into anything", "reddit - explore anything"]:
@@ -340,7 +384,7 @@ class ExpedUPEngine:
                 is_generic_title = True
 
         has_login_wall = any(w in title_lower for w in ["log in", "login", "create an account", "redirecting"])
-        not_found = any(w in title_lower or w in og_title_lower or w in og_desc_lower for w in [
+        not_found = not_found_explicit or any(w in title_lower or w in og_title_lower or w in og_desc_lower for w in [
             "not found", "404", "page isn't available", "doesn't exist",
             "user not found", "nobody on reddit goes by that name",
             "this account doesn't exist", "sorry, this page isn't available"
@@ -355,6 +399,8 @@ class ExpedUPEngine:
         exists = False
         if matched_search_url:
             exists = True
+        elif tiktok_user_found:
+            exists = True
         elif status in [200, 301, 302, 307] and not not_found and not is_generic_title:
             if has_target_mention:
                 exists = True
@@ -363,8 +409,11 @@ class ExpedUPEngine:
 
         final_desc = og_desc
         if snippet_bio:
-            if not final_desc or has_login_wall or len(snippet_bio) > len(final_desc):
+            if not final_desc or (has_login_wall and not tiktok_user_found) or len(snippet_bio) > len(final_desc):
                 final_desc = snippet_bio
+
+        if exists and final_desc:
+            self.harvest_entities(final_desc)
 
         profile = {
             "platform": platform["name"],
