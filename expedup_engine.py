@@ -11,6 +11,7 @@ import time
 import re
 import socket
 import random
+import threading
 from typing import Dict, List, Callable, Optional
 from config import USER_AGENTS, SOCIAL_PLATFORMS, DOMAIN_TLDS
 from settings_manager import load_settings
@@ -24,7 +25,7 @@ SSL_CTX.verify_mode = ssl.CERT_NONE
 def is_search_result_relevant(target: str, title: str, snippet: str, url: str, strict: bool = False) -> bool:
     """
     Verify that a search result is genuinely related to the target keyword,
-    filtering out engine fallback/trending links and accidental substring collisions.
+    supporting brand variants (e.g. Luuks GH, Luuks-GH) and filtering out engine fallback links.
     """
     if not target:
         return True
@@ -36,21 +37,29 @@ def is_search_result_relevant(target: str, title: str, snippet: str, url: str, s
     combined_text = f"{title} {snippet}".lower()
     url_lower = url.lower()
 
-    # 1. Target appears as an explicit word boundary in title or snippet
-    word_pat = rf'\b{re.escape(clean_target)}\b'
-    if re.search(word_pat, combined_text) or target.lower() in combined_text:
+    # Build target pattern variants (e.g. "luuksgh", "luuks gh", "luuks-gh", "luuks_gh")
+    target_variants = [re.escape(clean_target), re.escape(target.lower())]
+    if len(clean_target) > 4 and clean_target.endswith(("gh", "ng", "uk", "us", "ca", "za", "ke")):
+        base = clean_target[:-2]
+        suf = clean_target[-2:]
+        target_variants.append(rf"{re.escape(base)}[\s\-_]+{re.escape(suf)}")
+
+    var_pattern = "|".join(target_variants)
+
+    # 1. Target or brand variant appears in Title or Snippet
+    if re.search(rf'\b(?:{var_pattern})\b', combined_text, re.IGNORECASE) or target.lower() in combined_text:
         return True
 
-    # 2. Target is the dedicated second-level domain (e.g. waitrive.com, luuksgh.org)
-    domain_pat = rf'(?:^|https?://(?:[a-z0-9-]+\.)?){re.escape(clean_target)}\.[a-z]{{2,}}'
-    if re.search(domain_pat, url_lower):
+    # 2. Check if URL is a dedicated profile, channel, domain, or primary handle for target
+    # e.g. instagram.com/luuksgh, facebook.com/luuksgh, luuksgh.com, github.com/kwasihenri
+    if re.search(rf'/(?:@|company/|in/|pages?/|user/)?{re.escape(clean_target)}(?:/|$|\.|\?)', url_lower):
+        return True
+    if re.search(rf'(?:^|https?://(?:[a-z0-9-]+\.)?){re.escape(clean_target)}\.[a-z]{{2,}}', url_lower):
         return True
 
-    # 3. Target is the primary user handle or route slug in the path
-    # e.g. /luuksgh/ or /@luuksgh or /user/luuksgh or /company/luuksgh
-    # Excludes random hyphenated blog slugs like '...cant-waitrive/123'
-    slug_pat = rf'/(?:@|company/|in/|pages?/|user/)?{re.escape(clean_target)}(?:/|$|\.|\?)'
-    if re.search(slug_pat, url_lower):
+    # 3. Target appears in URL path (excluding random third-party forum/post/comment slugs)
+    is_post_slug = bool(re.search(r'/(?:posts|photos|videos|status|thread|forums|comments|discussion)/', url_lower))
+    if clean_target in url_lower and not is_post_slug:
         return True
 
     return False
@@ -60,11 +69,17 @@ class ExpedUPEngine:
     def __init__(self, log_cb: Optional[Callable[[str], None]] = None,
                  progress_cb: Optional[Callable[[int, int, str], None]] = None,
                  result_cb: Optional[Callable[[str, dict], None]] = None,
+                 network_struggle_cb: Optional[Callable[[dict], None]] = None,
                  settings: Optional[dict] = None):
         self.log_cb = log_cb or (lambda msg: None)
         self.progress_cb = progress_cb or (lambda c, t, s: None)
         self.result_cb = result_cb or (lambda cat, item: None)
+        self.network_struggle_cb = network_struggle_cb or (lambda data: None)
         self.stop_requested = False
+        self.is_paused = False
+        self.pause_event = threading.Event()
+        self.pause_event.set()
+        self.consecutive_net_failures = 0
         self.current_target = ""
         self.strict_keyword = False
 
@@ -96,9 +111,66 @@ class ExpedUPEngine:
             }
         }
 
+    @staticmethod
+    def check_internet(host: str = "8.8.8.8", port: int = 53, timeout: float = 2.0) -> bool:
+        """Check WAN connectivity using a lightweight socket test."""
+        try:
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sock.settimeout(timeout)
+            sock.connect((host, port))
+            sock.close()
+            return True
+        except Exception:
+            return False
+
+    def pause(self):
+        """Pause expedition execution loop."""
+        if not self.is_paused:
+            self.is_paused = True
+            self.pause_event.clear()
+            self.log("[PAUSE] Expedition paused due to network issues or user action.")
+
+    def resume(self):
+        """Resume expedition execution loop."""
+        if self.is_paused:
+            self.is_paused = False
+            self.consecutive_net_failures = 0
+            self.pause_event.set()
+            self.log("[RESUME] Expedition resumed.")
+
+    def force_continue(self):
+        """Forcibly resume expedition execution, bypassing network struggle state."""
+        self.consecutive_net_failures = 0
+        self.resume()
+        self.log("[FORCE] Expedition forcibly resumed by user.")
+
+    def _check_and_handle_pause(self):
+        """Block execution cleanly if engine is paused or stop requested."""
+        if self.stop_requested:
+            return
+        if self.is_paused or not self.pause_event.is_set():
+            self.pause_event.wait()
+
+    def _handle_network_failure(self, err_msg: str = "", url: str = ""):
+        """Track network failures and trigger struggle callback/pause if threshold reached."""
+        self.consecutive_net_failures += 1
+        is_online = self.check_internet()
+        if self.consecutive_net_failures >= 3 or not is_online:
+            self.log(f"[NETWORK STRENGTH WARNING] Connection struggling ({self.consecutive_net_failures} failures). Pausing expedition.")
+            self.network_struggle_cb({
+                "failures": self.consecutive_net_failures,
+                "target": self.current_target,
+                "url": url,
+                "online": is_online,
+                "error": err_msg
+            })
+            self.pause()
+            self._check_and_handle_pause()
+
     def stop(self):
         """Signal engine to stop running expedition."""
         self.stop_requested = True
+        self.resume()  # unblock pause wait if stopped
         self.log("[!] Expedition stop requested by user.")
 
     def log(self, message: str):
@@ -112,15 +184,32 @@ class ExpedUPEngine:
         ua = random.choice(USER_AGENTS) if self.ua_rotation else USER_AGENTS[0]
         return {
             "User-Agent": ua,
-            "Accept": "*/*",
-            "Accept-Language": "en-US,en;q=0.9"
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+            "Accept-Language": "en-US,en;q=0.9",
+            "Sec-Ch-Ua": '"Microsoft Edge";v="123", "Not:A-Brand";v="8", "Chromium";v="123"',
+            "Sec-Ch-Ua-Mobile": "?0",
+            "Sec-Ch-Ua-Platform": '"Windows"',
+            "Sec-Fetch-Dest": "document",
+            "Sec-Fetch-Mode": "navigate",
+            "Sec-Fetch-Site": "none",
+            "Sec-Fetch-User": "?1",
+            "Upgrade-Insecure-Requests": "1"
         }
 
     # ---------------------------------------------------------
     # 1. Search Engine Probing (DuckDuckGo Lite, Bing, Yahoo)
     # ---------------------------------------------------------
+    def _is_network_exception(self, e: Exception) -> bool:
+        """Check if exception indicates network connectivity issues."""
+        if isinstance(e, (urllib.error.URLError, socket.timeout, ConnectionResetError, TimeoutError, OSError)):
+            return True
+        err_str = str(e).lower()
+        net_keywords = ["timed out", "timeout", "connection refused", "connection reset", "forcibly closed", "10054", "name or service not known", "getaddrinfo failed", "temporary failure"]
+        return any(k in err_str for k in net_keywords)
+
     def search_duckduckgo_html(self, query: str) -> List[dict]:
         """Perform search query via DuckDuckGo HTML endpoint with resilient block parsing."""
+        self._check_and_handle_pause()
         if self.stop_requested:
             return []
 
@@ -129,7 +218,8 @@ class ExpedUPEngine:
         results = []
 
         try:
-            with urllib.request.urlopen(req, context=SSL_CTX, timeout=self.timeout) as resp:
+            with urllib.request.urlopen(req, context=SSL_CTX, timeout=min(2.5, self.timeout)) as resp:
+                self.consecutive_net_failures = 0
                 html = resp.read().decode("utf-8", errors="ignore")
                 blocks = html.split('<div class="result results_links')
                 for b in blocks[1:]:
@@ -180,11 +270,14 @@ class ExpedUPEngine:
 
         except Exception as e:
             self.log(f"DDG search notice on '{query}': {e}")
+            if self._is_network_exception(e):
+                self._handle_network_failure(str(e), url)
 
         return results
 
     def search_bing(self, query: str) -> List[dict]:
         """Perform search query via Bing with robust block and lineclamp parsing."""
+        self._check_and_handle_pause()
         if self.stop_requested:
             return []
 
@@ -197,6 +290,7 @@ class ExpedUPEngine:
 
         try:
             with urllib.request.urlopen(req, context=SSL_CTX, timeout=self.timeout) as resp:
+                self.consecutive_net_failures = 0
                 html_text = resp.read().decode("utf-8", errors="ignore")
                 blocks = html_text.split('<li class="b_algo"')
                 for b in blocks[1:]:
@@ -244,6 +338,8 @@ class ExpedUPEngine:
                         self.result_cb("search", item)
         except Exception as e:
             self.log(f"Bing search notice on '{query}': {e}")
+            if self._is_network_exception(e):
+                self._handle_network_failure(str(e), url)
 
         return results
 
@@ -252,6 +348,7 @@ class ExpedUPEngine:
     # ---------------------------------------------------------
     def probe_social_profile(self, platform: dict, target: str) -> dict:
         """Probe platform URL for target presence and metadata, enriching with cached search snippets."""
+        self._check_and_handle_pause()
         if self.stop_requested:
             return {}
 
@@ -270,7 +367,8 @@ class ExpedUPEngine:
         not_found_explicit = False
 
         try:
-            with urllib.request.urlopen(req, context=SSL_CTX, timeout=self.timeout) as resp:
+            with urllib.request.urlopen(req, context=SSL_CTX, timeout=min(5.0, self.timeout)) as resp:
+                self.consecutive_net_failures = 0
                 status = resp.getcode()
                 html = resp.read().decode("utf-8", errors="ignore")
 
@@ -325,8 +423,10 @@ class ExpedUPEngine:
 
         except urllib.error.HTTPError as e:
             status = e.code
-        except Exception:
+        except Exception as e:
             status = 0
+            if self._is_network_exception(e):
+                self._handle_network_failure(str(e), url)
 
         # Correlate with search engine results for richer metadata / cached bio
         # (Overcomes SPA login walls for Instagram, TikTok, Threads, Facebook)
@@ -404,10 +504,8 @@ class ExpedUPEngine:
             exists = True
         elif tiktok_user_found:
             exists = True
-        elif status in [200, 301, 302, 307, 999] and not not_found and not is_generic_title:
+        elif status in [200, 301, 302, 307] and not not_found and not is_generic_title:
             if has_target_mention:
-                exists = True
-            elif plat_key in ["github", "linkedin company", "linkedin profile", "youtube", "twitter / x", "dev.to", "hashnode"]:
                 exists = True
 
         final_desc = og_desc
@@ -439,6 +537,7 @@ class ExpedUPEngine:
     # ---------------------------------------------------------
     def probe_domain(self, domain_name: str) -> dict:
         """Check DNS and HTTP availability of a domain."""
+        self._check_and_handle_pause()
         if self.stop_requested:
             return {}
 

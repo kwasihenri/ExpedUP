@@ -2,7 +2,7 @@
   "theme": "Light",
   "text_size": "Normal (100%)",
   "default_depth": "Deep (Multi-Engine)",
-  "export_dir": "artifacts/expeditions",
+  "export_dir": "C:/MyProjects/OpenSource/ExpedUP/artifacts/newExpeditions",
   "auto_export_all": false,
   "request_timeout": 12,
   "min_delay": 0.8,

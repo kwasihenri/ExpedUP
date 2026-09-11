@@ -58,6 +58,7 @@ class ExpedUPApp(ctk.CTk):
         self.is_running = False
         self.auto_scroll_logs = True
         self.is_advanced_visible = False
+        self.net_modal: Optional[Any] = None
 
         self.current_results: Dict[str, Any] = {
             "target": "",
@@ -375,7 +376,23 @@ class ExpedUPApp(ctk.CTk):
             font=ctk.CTkFont(size=11), text_color=THEME_COLORS["text_secondary"],
             anchor="w"
         )
-        self.lbl_progress_status.pack(fill="x", pady=(0, 12))
+        self.lbl_progress_status.pack(fill="x", pady=(0, 6))
+
+        # Tappable Network Warning Badge / Button (Hidden by default)
+        self.btn_network_warning = ctk.CTkButton(
+            scroll_sidebar,
+            text="  ⚠️ Connection Struggling (Tap to Open Manager)",
+            image=self._get_icon("warning", (13, 13), THEME_COLORS["warning"]),
+            compound="left",
+            command=self._open_network_modal,
+            height=30,
+            font=ctk.CTkFont(size=11, weight="bold"),
+            fg_color=THEME_COLORS["card_subtle"],
+            hover_color=THEME_COLORS["secondary_hover"],
+            text_color=THEME_COLORS["warning"],
+            border_width=1,
+            border_color=THEME_COLORS["warning"]
+        )
 
         # Divider
         ctk.CTkFrame(scroll_sidebar, height=1, fg_color=THEME_COLORS["border"]).pack(fill="x", pady=8)
@@ -1859,6 +1876,7 @@ class ExpedUPApp(ctk.CTk):
         # Reset UI & State
         self._reset_dashboard_results()
         self.is_running = True
+        self.btn_network_warning.pack_forget()
         self.btn_launch.configure(
             state="disabled",
             text="  Probing Target...",
@@ -1879,6 +1897,7 @@ class ExpedUPApp(ctk.CTk):
             log_cb=self._on_log_message,
             progress_cb=self._on_progress_update,
             result_cb=self._on_result_item,
+            network_struggle_cb=self._on_network_struggle,
             settings=self.settings
         )
 
@@ -1923,6 +1942,10 @@ class ExpedUPApp(ctk.CTk):
             image=self._get_icon("play", (16, 16), "#ffffff")
         )
         self.btn_stop.configure(state="disabled")
+        self.btn_network_warning.pack_forget()
+        if self.net_modal and self.net_modal.winfo_exists():
+            self.net_modal.destroy()
+            self.net_modal = None
 
         if self.engine and self.engine.stop_requested:
             self.status_pill.configure(
@@ -1941,6 +1964,73 @@ class ExpedUPApp(ctk.CTk):
             )
             self.prog_bar.set(1.0)
             self.lbl_progress_status.configure(text="Expedition completed successfully.")
+
+    # -------------------------------------------------------------------------
+    # Network Struggle & Pause/Resume Event Handlers
+    # -------------------------------------------------------------------------
+    def _on_network_struggle(self, data: dict):
+        """Thread-safe callback when engine signals network interruption."""
+        def _dispatch():
+            self.status_pill.configure(
+                text="  NETWORK PAUSED",
+                image=self._get_icon("warning", (12, 12), THEME_COLORS["warning"]),
+                text_color=THEME_COLORS["warning"],
+                fg_color=THEME_COLORS["card_subtle"]
+            )
+            self.lbl_progress_status.configure(
+                text="[PAUSED] Internet connection struggling. Tap warning pill below to open Connection Manager."
+            )
+            self.btn_network_warning.pack(fill="x", pady=(0, 10), before=self.action_divider)
+            self._open_network_modal(data)
+
+        self.after(0, _dispatch)
+
+    def _open_network_modal(self, data: dict = None):
+        """Open or focus the network struggle manager modal dialog."""
+        if self.net_modal and self.net_modal.winfo_exists():
+            self.net_modal.focus_set()
+            return
+        self.net_modal = NetworkStruggleModal(
+            parent=self,
+            engine=self.engine,
+            on_resume_cb=self._on_modal_resume,
+            on_force_cb=self._on_modal_force,
+            on_dismiss_cb=self._on_modal_dismiss,
+            network_data=data
+        )
+
+    def _on_modal_resume(self):
+        """Callback when user or auto-checker resumes expedition from modal."""
+        if self.engine:
+            self.engine.resume()
+        self.btn_network_warning.pack_forget()
+        self.status_pill.configure(
+            text="  RECONNAISSANCE ACTIVE",
+            image=self._get_icon("loader", (12, 12), THEME_COLORS["warning"]),
+            text_color=THEME_COLORS["warning"],
+            fg_color=THEME_COLORS["card_subtle"]
+        )
+        self.lbl_progress_status.configure(text="Expedition resumed after network recovery.")
+
+    def _on_modal_force(self):
+        """Callback when user forces expedition continuation from modal."""
+        if self.engine:
+            self.engine.force_continue()
+        self.btn_network_warning.pack_forget()
+        self.status_pill.configure(
+            text="  RECONNAISSANCE ACTIVE",
+            image=self._get_icon("loader", (12, 12), THEME_COLORS["warning"]),
+            text_color=THEME_COLORS["warning"],
+            fg_color=THEME_COLORS["card_subtle"]
+        )
+        self.lbl_progress_status.configure(text="Expedition forcibly resumed by user.")
+
+    def _on_modal_dismiss(self):
+        """Callback when user dismisses modal window."""
+        self.btn_network_warning.pack(fill="x", pady=(0, 10), before=self.action_divider)
+        self.lbl_progress_status.configure(
+            text="[PAUSED] Internet struggling. Tap warning pill above to open Connection Manager."
+        )
 
         # Update Live Markdown Dossier preview
         self._refresh_dossier_preview()
@@ -2270,6 +2360,186 @@ class ExpedUPApp(ctk.CTk):
             self.seg_setting_theme.set(val)
 
         self._on_log_message(f"[THEME] Interface appearance switched to: {val} Mode")
+
+
+class NetworkStruggleModal(ctk.CTkToplevel):
+    """Modal overlay dialog for managing internet network interruptions during expeditions."""
+    def __init__(self, parent, engine, on_resume_cb, on_force_cb, on_dismiss_cb, network_data: dict = None):
+        super().__init__(parent)
+        self.parent = parent
+        self.engine = engine
+        self.on_resume_cb = on_resume_cb
+        self.on_force_cb = on_force_cb
+        self.on_dismiss_cb = on_dismiss_cb
+        self.network_data = network_data or {}
+        self.auto_check_active = True
+
+        self.title("Internet Connection Manager — ExpedUP")
+        self.geometry("540x340")
+        self.resizable(False, False)
+        self.configure(fg_color=THEME_COLORS["card"])
+        self.transient(parent)
+        self.grab_set()
+
+        # Center modal relative to parent window
+        try:
+            px = parent.winfo_x()
+            py = parent.winfo_y()
+            pw = parent.winfo_width()
+            ph = parent.winfo_height()
+            self.geometry(f"+{px + (pw - 540) // 2}+{py + (ph - 340) // 2}")
+        except Exception:
+            pass
+
+        self._build_ui()
+        self._start_auto_check()
+
+    def _build_ui(self):
+        container = ctk.CTkFrame(self, fg_color="transparent")
+        container.pack(fill="both", expand=True, padx=20, pady=20)
+
+        # Title / Warning Header
+        header = ctk.CTkFrame(container, fg_color="transparent")
+        header.pack(fill="x", pady=(0, 12))
+
+        lbl_icon = ctk.CTkLabel(
+            header, text="",
+            image=self.parent._get_icon("warning", (28, 28), THEME_COLORS["warning"])
+        )
+        lbl_icon.pack(side="left", padx=(0, 10))
+
+        title_box = ctk.CTkFrame(header, fg_color="transparent")
+        title_box.pack(side="left")
+
+        ctk.CTkLabel(
+            title_box, text="Internet Connection Struggling",
+            font=ctk.CTkFont(size=16, weight="bold"),
+            text_color=THEME_COLORS["warning"]
+        ).pack(anchor="w")
+
+        ctk.CTkLabel(
+            title_box, text="Expedition auto-paused to preserve OSINT scan accuracy",
+            font=ctk.CTkFont(size=12),
+            text_color=THEME_COLORS["text_secondary"]
+        ).pack(anchor="w")
+
+        # Details Card
+        card_info = ctk.CTkFrame(
+            container, corner_radius=8,
+            fg_color=THEME_COLORS["card_subtle"],
+            border_width=1, border_color=THEME_COLORS["border"]
+        )
+        card_info.pack(fill="x", pady=(0, 14))
+
+        inner = ctk.CTkFrame(card_info, fg_color="transparent")
+        inner.pack(fill="x", padx=14, pady=12)
+
+        self.lbl_status = ctk.CTkLabel(
+            inner, text="Connection Status:  Testing internet reachability...",
+            font=ctk.CTkFont(size=13, weight="bold"),
+            text_color=THEME_COLORS["text_primary"]
+        )
+        self.lbl_status.pack(anchor="w", pady=(0, 4))
+
+        err_detail = self.network_data.get("error") or "Multiple search probes timed out or encountered connection resets."
+        self.lbl_detail = ctk.CTkLabel(
+            inner,
+            text=f"Details: {err_detail[:120]}",
+            font=ctk.CTkFont(size=11),
+            text_color=THEME_COLORS["text_muted"],
+            wraplength=460, justify="left"
+        )
+        self.lbl_detail.pack(anchor="w")
+
+        # Action Buttons Row
+        action_frame = ctk.CTkFrame(container, fg_color="transparent")
+        action_frame.pack(fill="x", pady=(10, 0))
+
+        btn_retry = ctk.CTkButton(
+            action_frame, text="  Retry / Check Now",
+            image=self.parent._get_icon("refresh", (14, 14), "#ffffff"),
+            compound="left",
+            command=self._manual_retry,
+            height=36, font=ctk.CTkFont(size=12, weight="bold"),
+            fg_color=THEME_COLORS["primary"],
+            hover_color=THEME_COLORS["primary_hover"],
+            text_color="#ffffff"
+        )
+        btn_retry.pack(side="left", padx=(0, 8))
+
+        btn_force = ctk.CTkButton(
+            action_frame, text="  Force Continue",
+            image=self.parent._get_icon("play", (14, 14), "#ffffff"),
+            compound="left",
+            command=self._force_continue,
+            height=36, font=ctk.CTkFont(size=12, weight="bold"),
+            fg_color=THEME_COLORS["warning"],
+            hover_color="#d97706",
+            text_color="#ffffff"
+        )
+        btn_force.pack(side="left", padx=(0, 8))
+
+        btn_dismiss = ctk.CTkButton(
+            action_frame, text="  Dismiss Modal",
+            image=self.parent._get_icon("x", (13, 13), THEME_COLORS["secondary_text"]),
+            compound="left",
+            command=self._dismiss,
+            height=36, font=ctk.CTkFont(size=12),
+            fg_color=THEME_COLORS["secondary"],
+            hover_color=THEME_COLORS["secondary_hover"],
+            text_color=THEME_COLORS["secondary_text"],
+            border_width=1, border_color=THEME_COLORS["border"]
+        )
+        btn_dismiss.pack(side="right")
+
+    def _start_auto_check(self):
+        """Periodically check internet connectivity every 3 seconds."""
+        if not self.auto_check_active or not self.winfo_exists():
+            return
+        is_online = self.engine.check_internet() if self.engine else False
+        if is_online:
+            self.lbl_status.configure(
+                text="Connection Status:  🟢 Online — Connection Restored!",
+                text_color=THEME_COLORS["success"]
+            )
+            self.lbl_detail.configure(text="Internet reachability verified. Resuming expedition in 1 second...")
+            self.after(1000, self._auto_resume)
+            return
+        else:
+            self.lbl_status.configure(
+                text="Connection Status:  🔴 Offline / Struggling (Auto-checking...)",
+                text_color=THEME_COLORS["danger"]
+            )
+
+        self.after(3000, self._start_auto_check)
+
+    def _manual_retry(self):
+        is_online = self.engine.check_internet() if self.engine else False
+        if is_online:
+            self._auto_resume()
+        else:
+            self.lbl_status.configure(
+                text="Connection Status:  🔴 Still Disconnected / Struggling",
+                text_color=THEME_COLORS["danger"]
+            )
+
+    def _auto_resume(self):
+        self.auto_check_active = False
+        if self.on_resume_cb:
+            self.on_resume_cb()
+        self.destroy()
+
+    def _force_continue(self):
+        self.auto_check_active = False
+        if self.on_force_cb:
+            self.on_force_cb()
+        self.destroy()
+
+    def _dismiss(self):
+        self.auto_check_active = False
+        if self.on_dismiss_cb:
+            self.on_dismiss_cb()
+        self.destroy()
 
 
 def run_gui():
