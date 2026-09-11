@@ -376,6 +376,9 @@ class ExpedUPEngine:
             # Telegram displays a placeholder page for unclaimed handles with title 'Telegram: Contact @...' and no tgme_page_extra
             if ("tgme_page_extra" not in html) and (title_lower.startswith("telegram: contact @") or "if you have telegram, you can contact @" in html.lower()):
                 is_generic_title = True
+        elif "linkedin" in plat_key:
+            if title_lower in ["linkedin", "sign in", "log in", "authwall"] or "sign in" in title_lower:
+                is_generic_title = True
         elif "facebook" in plat_key:
             if title_lower in ["facebook", "log in to facebook", "log into facebook"] or "log in" in title_lower:
                 is_generic_title = True
@@ -401,10 +404,10 @@ class ExpedUPEngine:
             exists = True
         elif tiktok_user_found:
             exists = True
-        elif status in [200, 301, 302, 307] and not not_found and not is_generic_title:
+        elif status in [200, 301, 302, 307, 999] and not not_found and not is_generic_title:
             if has_target_mention:
                 exists = True
-            elif plat_key in ["github", "linkedin company", "youtube", "twitter / x"]:
+            elif plat_key in ["github", "linkedin company", "linkedin profile", "youtube", "twitter / x", "dev.to", "hashnode"]:
                 exists = True
 
         final_desc = og_desc
@@ -448,28 +451,37 @@ class ExpedUPEngine:
         except Exception:
             ip = None
 
-        if ip:
-            url = f"https://{domain_name}"
+        # Attempt direct HTTPS/HTTP connection to fetch site title & bio
+        for scheme in ["https", "http"]:
+            if title or http_code == 200:
+                break
+            url = f"{scheme}://{domain_name}"
             req = urllib.request.Request(url, headers=self.get_headers())
             try:
                 with urllib.request.urlopen(req, context=SSL_CTX, timeout=self.timeout) as resp:
                     http_code = resp.getcode()
-                    html = resp.read(20480).decode("utf-8", errors="ignore")
-                    m_t = re.search(r"<title[^>]*>(.*?)</title>", html, re.IGNORECASE | re.DOTALL)
+                    html_content = resp.read(20480).decode("utf-8", errors="ignore")
+                    m_t = re.search(r"<title[^>]*>(.*?)</title>", html_content, re.IGNORECASE | re.DOTALL)
                     title = m_t.group(1).strip() if m_t else ""
-                    self.harvest_entities(f"{title} {html}")
+                    import html
+                    title = html.unescape(title)
+                    self.harvest_entities(f"{title} {html_content}")
+                    if not ip:
+                        ip = "Resolved via HTTP"
             except Exception:
-                http_code = 0
+                pass
+
+        is_registered = bool(ip or http_code in [200, 301, 302, 307, 308, 403])
 
         res = {
             "domain": domain_name,
-            "resolved_ip": ip,
-            "is_registered": ip is not None,
+            "resolved_ip": ip if is_registered else None,
+            "is_registered": is_registered,
             "status_code": http_code,
             "title": title
         }
 
-        if ip is not None:
+        if is_registered:
             self.result_cb("domain", res)
 
         return res
@@ -607,6 +619,10 @@ class ExpedUPEngine:
 
             # Natural social & discovery probes
             queries.extend([
+                f'"{target}" linkedin',
+                f'"{target}" github',
+                f'"{target}" dev',
+                f'"{target}" portfolio',
                 f'"{target}" instagram',
                 f'"{target}" tiktok',
                 f'"{target}" facebook',

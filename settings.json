@@ -14,8 +14,11 @@
     "TikTok",
     "Twitter / X",
     "Facebook",
+    "LinkedIn Profile",
     "LinkedIn Company",
     "GitHub",
+    "Dev.to",
+    "Hashnode",
     "YouTube",
     "Pinterest",
     "Snapchat",
@@ -26,20 +29,24 @@
     "SoundCloud"
   ],
   "domain_tlds": [
+    ".dev",
     ".com",
     ".com.gh",
     ".org",
     ".net",
+    ".io",
+    ".app",
+    ".tech",
     ".store",
     ".online",
     ".co",
-    ".io",
+    ".xyz",
+    ".me",
+    ".site",
     ".shop",
     ".africa",
     ".ng",
     ".ke",
-    ".co.uk",
-    ".app",
-    ".tech"
+    ".co.uk"
   ]
 }

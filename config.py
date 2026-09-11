@@ -23,8 +23,11 @@ SOCIAL_PLATFORMS = [
     {"name": "TikTok", "url_template": "https://www.tiktok.com/@{target}", "category": "Social / Video"},
     {"name": "Twitter / X", "url_template": "https://twitter.com/{target}", "category": "Social / News"},
     {"name": "Facebook", "url_template": "https://www.facebook.com/{target}/", "category": "Social / Community"},
-    {"name": "LinkedIn Company", "url_template": "https://www.linkedin.com/company/{target}/", "category": "Professional"},
+    {"name": "LinkedIn Profile", "url_template": "https://www.linkedin.com/in/{target}/", "category": "Professional / Individual"},
+    {"name": "LinkedIn Company", "url_template": "https://www.linkedin.com/company/{target}/", "category": "Professional / Business"},
     {"name": "GitHub", "url_template": "https://github.com/{target}", "category": "Developer"},
+    {"name": "Dev.to", "url_template": "https://dev.to/{target}", "category": "Developer"},
+    {"name": "Hashnode", "url_template": "https://hashnode.com/@{target}", "category": "Developer"},
     {"name": "YouTube", "url_template": "https://www.youtube.com/@{target}", "category": "Video"},
     {"name": "Pinterest", "url_template": "https://www.pinterest.com/{target}/", "category": "Lifestyle / E-Commerce"},
     {"name": "Snapchat", "url_template": "https://www.snapchat.com/add/{target}", "category": "Social / Instant"},
@@ -37,8 +40,8 @@ SOCIAL_PLATFORMS = [
 
 # Top Domain Extensions for Brand/Name Probe
 DOMAIN_TLDS = [
-    ".com", ".com.gh", ".org", ".net", ".store", ".online", ".co", ".io", 
-    ".shop", ".africa", ".ng", ".ke", ".co.uk", ".app", ".tech"
+    ".dev", ".com", ".com.gh", ".org", ".net", ".io", ".app", ".tech", 
+    ".store", ".online", ".co", ".xyz", ".me", ".site", ".shop", ".africa", ".ng", ".ke", ".co.uk"
 ]
 
 # Theme Tokens (Light Mode Default with full Dark Mode support, inspired by Vectihost & Selligine design systems)

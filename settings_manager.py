@@ -45,6 +45,17 @@ def load_settings() -> Dict[str, Any]:
         # Merge with defaults to guarantee all expected keys exist
         merged = dict(DEFAULT_SETTINGS)
         merged.update(data)
+
+        # Ensure any newly added default platforms/TLDs in config.py are included
+        if isinstance(data.get("enabled_platforms"), list):
+            for p in DEFAULT_SETTINGS["enabled_platforms"]:
+                if p not in merged["enabled_platforms"]:
+                    merged["enabled_platforms"].append(p)
+        if isinstance(data.get("domain_tlds"), list):
+            for tld in DEFAULT_SETTINGS["domain_tlds"]:
+                if tld not in merged["domain_tlds"]:
+                    merged["domain_tlds"].append(tld)
+
         return merged
     except Exception as e:
         print(f"[WARN] Failed to load settings.json ({e}), reverting to defaults.")
