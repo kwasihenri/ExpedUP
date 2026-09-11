@@ -57,7 +57,7 @@ def run_cli(args):
     )
 
     print("\n" + "=" * 65)
-    print("  EXECUTIVE SUMMARY")
+    print("  EXECUTIVE SUMMARY & RECON COUNTERS")
     print("=" * 65)
     print(f"Total Web Links:        {len(results.get('search_results', []))}")
     print(f"Active Social Profiles: {len([p for p in results.get('social_profiles', []) if p.get('exists')])}")
@@ -65,6 +65,23 @@ def run_cli(args):
     print(f"Discovered Phones:      {len(results.get('entities', {}).get('phones', []))}")
     print(f"Discovered Emails:      {len(results.get('entities', {}).get('emails', []))}")
     print(f"Mentions & Hashtags:    {len(results.get('entities', {}).get('mentions', [])) + len(results.get('entities', {}).get('hashtags', []))}")
+
+    intel = results.get("intelligence", {})
+    bc = intel.get("brand_clearance", {})
+    bp = intel.get("business_profile", {})
+    dr = intel.get("digital_roadmap", {})
+
+    print("\n" + "=" * 65)
+    print("  SYNTHESIZED INTELLIGENCE (CORE FUNCTIONALITY)")
+    print("=" * 65)
+    print(f"Brand Clearance Score:  {bc.get('uniqueness_score', 0)}/100 ({bc.get('clearance_rating', '')})")
+    print(f"Verdict:                {bc.get('verdict', '')}")
+    print(f"Operating Base:         {bp.get('operating_base', 'Undetected')}")
+    print(f"Mobility Model:         {bp.get('mobility_model', '')}")
+    print(f"Primary Contact:        {bp.get('primary_contact', 'N/A')}")
+    srv_list = [s.get('service', '') for s in bp.get('services', [])]
+    print(f"Identified Services:    {', '.join(srv_list) if srv_list else 'General Commercial'}")
+    print(f"Digital Blueprint:      {len(dr.get('recommended_platform_modules', []))} platform modules recommended")
 
     if args.export_all:
         out_dir = args.output or DEFAULT_EXPORT_DIR

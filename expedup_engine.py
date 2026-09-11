@@ -71,21 +71,19 @@ class ExpedUPEngine:
         self.log_cb(formatted)
 
     def get_headers(self) -> dict:
-        """Return headers with modern user agent (randomized if rotation enabled)."""
+        """Return headers with modern user agent and clean browser parity."""
         ua = random.choice(USER_AGENTS) if self.ua_rotation else USER_AGENTS[0]
         return {
             "User-Agent": ua,
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-            "Accept-Language": "en-US,en;q=0.9",
-            "Cache-Control": "no-cache",
-            "Pragma": "no-cache"
+            "Accept": "*/*",
+            "Accept-Language": "en-US,en;q=0.9"
         }
 
     # ---------------------------------------------------------
     # 1. Search Engine Probing (DuckDuckGo Lite, Bing, Yahoo)
     # ---------------------------------------------------------
     def search_duckduckgo_html(self, query: str) -> List[dict]:
-        """Perform search query via DuckDuckGo HTML endpoint."""
+        """Perform search query via DuckDuckGo HTML endpoint with resilient block parsing."""
         if self.stop_requested:
             return []
 
@@ -96,43 +94,42 @@ class ExpedUPEngine:
         try:
             with urllib.request.urlopen(req, context=SSL_CTX, timeout=self.timeout) as resp:
                 html = resp.read().decode("utf-8", errors="ignore")
+                blocks = html.split('<div class="result results_links')
+                for b in blocks[1:]:
+                    # Extract title
+                    m_t = re.search(r'<h2[^>]*class="[^"]*result__title[^"]*"[^>]*>.*?<a[^>]+href="([^"]+)"[^>]*>(.*?)</a>', b, re.DOTALL)
+                    if not m_t:
+                        m_t = re.search(r'<a[^>]+class="[^"]*result__a[^"]*"[^>]+href="([^"]+)"[^>]*>(.*?)</a>', b, re.DOTALL)
 
-                # Extract all titles & links
-                title_matches = re.findall(
-                    r'<a[^>]+class="[^"]*result__a[^"]*"[^>]+href="([^"]+)"[^>]*>(.*?)</a>',
-                    html, re.DOTALL | re.IGNORECASE
-                )
-                if not title_matches:
-                    title_matches = re.findall(
-                        r'<a[^>]+href="([^"]+)"[^>]+class="[^"]*result__a[^"]*"[^>]*>(.*?)</a>',
-                        html, re.DOTALL | re.IGNORECASE
-                    )
+                    # Extract snippet
+                    m_s = re.search(r'<a[^>]+class="[^"]*result__snippet[^"]*"[^>]*>(.*?)</a>', b, re.DOTALL)
+                    if not m_s:
+                        m_s = re.search(r'<div[^>]*class="[^"]*result__snippet[^"]*"[^>]*>(.*?)</div>', b, re.DOTALL)
 
-                # Extract snippets
-                snippets = re.findall(
-                    r'<a[^>]+class="[^"]*result__snippet[^"]*"[^>]*>(.*?)</a>',
-                    html, re.DOTALL | re.IGNORECASE
-                )
+                    href = ""
+                    title = ""
+                    snip = ""
 
-                limit = min(len(title_matches), len(snippets)) if snippets else len(title_matches)
-
-                for i in range(limit):
-                    href, raw_title = title_matches[i]
-                    raw_snip = snippets[i] if i < len(snippets) else ""
+                    if m_t:
+                        href = m_t.group(1)
+                        title = re.sub(r'<[^>]+>', '', m_t.group(2)).strip()
+                    if m_s:
+                        snip = re.sub(r'<[^>]+>', '', m_s.group(1)).strip()
+                        if not href and 'href="' in m_s.group(0):
+                            m_sh = re.search(r'href="([^"]+)"', m_s.group(0))
+                            if m_sh:
+                                href = m_sh.group(1)
 
                     if "uddg=" in href:
                         m_u = re.search(r"uddg=([^&]+)", href)
                         if m_u:
                             href = urllib.parse.unquote(m_u.group(1))
 
-                    title = re.sub(r"<[^>]+>", "", raw_title).strip()
-                    snip = re.sub(r"<[^>]+>", "", raw_snip).strip()
-
-                    if href and not href.startswith("/") and title:
+                    if href and not href.startswith("/") and (title or snip):
                         item = {
                             "engine": "DuckDuckGo",
                             "query": query,
-                            "title": title,
+                            "title": title or "Web Finding",
                             "url": href,
                             "snippet": snip
                         }
@@ -148,33 +145,56 @@ class ExpedUPEngine:
 
 
     def search_bing(self, query: str) -> List[dict]:
-        """Perform search query via Bing."""
+        """Perform search query via Bing with robust block and lineclamp parsing."""
         if self.stop_requested:
             return []
 
-        url = f"https://www.bing.com/search?q={urllib.parse.quote(query)}"
-        req = urllib.request.Request(url, headers=self.get_headers())
+        url = f"https://www.bing.com/search?q={urllib.parse.quote(query)}&setlang=en-US"
+        headers = self.get_headers()
+        headers["Cookie"] = "SRCHHPGUSR=ADLT=OFF&NRSLT=20;"
+        headers["Accept-Language"] = "en-US,en;q=0.9"
+        req = urllib.request.Request(url, headers=headers)
         results = []
 
         try:
             with urllib.request.urlopen(req, context=SSL_CTX, timeout=self.timeout) as resp:
-                html = resp.read().decode("utf-8", errors="ignore")
-                blocks = html.split('<li class="b_algo"')
+                html_text = resp.read().decode("utf-8", errors="ignore")
+                blocks = html_text.split('<li class="b_algo"')
                 for b in blocks[1:]:
-                    m_title = re.search(r'<h2><a[^>]*href="([^"]+)"[^>]*>(.*?)</a></h2>', b, re.DOTALL)
+                    m_title = re.search(r'<h2[^>]*><a[^>]*href="([^"]+)"[^>]*>(.*?)</a></h2>', b, re.DOTALL)
                     href = m_title.group(1) if m_title else ""
-                    title = re.sub(r"<[^>]+>", "", m_title.group(2)) if m_title else ""
+                    title = re.sub(r"<[^>]+>", "", m_title.group(2)).strip() if m_title else ""
+
+                    # Unwrap Bing tracking redirect URL to canonical destination
+                    if "u=a1" in href:
+                        import base64
+                        m_u = re.search(r"[?&](?:amp;)?u=a1([^&]+)", href)
+                        if m_u:
+                            try:
+                                b64 = m_u.group(1)
+                                b64 += "=" * ((4 - len(b64) % 4) % 4)
+                                decoded_url = base64.urlsafe_b64decode(b64).decode("utf-8", errors="ignore")
+                                if decoded_url.startswith("http"):
+                                    href = decoded_url
+                            except Exception:
+                                pass
 
                     m_snip = re.search(r'<div class="b_caption">.*?<p[^>]*>(.*?)</p>', b, re.DOTALL)
-                    snip = re.sub(r"<[^>]+>", "", m_snip.group(1)) if m_snip else ""
+                    if not m_snip:
+                        m_snip = re.search(r'<p class="b_lineclamp[^"]*">(.*?)</p>', b, re.DOTALL)
+                    snip = re.sub(r"<[^>]+>", "", m_snip.group(1)).strip() if m_snip else ""
 
-                    if href and title:
+                    import html
+                    title = html.unescape(title)
+                    snip = html.unescape(snip)
+
+                    if href and not href.startswith("/") and (title or snip):
                         item = {
                             "engine": "Bing",
                             "query": query,
-                            "title": title.strip(),
-                            "url": href.strip(),
-                            "snippet": snip.strip()
+                            "title": title or "Web Finding",
+                            "url": href,
+                            "snippet": snip
                         }
                         results.append(item)
                         self.harvest_entities(f"{title} {snip}")
@@ -188,7 +208,7 @@ class ExpedUPEngine:
     # 2. Social Media & Digital Identity Probing
     # ---------------------------------------------------------
     def probe_social_profile(self, platform: dict, target: str) -> dict:
-        """Probe platform URL for target presence and metadata."""
+        """Probe platform URL for target presence and metadata, enriching with cached search snippets."""
         if self.stop_requested:
             return {}
 
@@ -232,17 +252,43 @@ class ExpedUPEngine:
         except Exception:
             status = 0
 
+        # Correlate with search engine results for richer metadata / cached bio
+        # (Overcomes SPA login walls for Instagram, TikTok, Threads, Facebook)
+        snippet_bio = ""
+        matched_search_url = False
+        plat_domain = urllib.parse.urlparse(url).netloc.replace("www.", "")
+
+        for s_res in self.results.get("search_results", []):
+            s_url = s_res.get("url", "")
+            if plat_domain in s_url and clean_target in s_url.lower():
+                matched_search_url = True
+                snip = s_res.get("snippet", "")
+                if snip and len(snip) > len(snippet_bio):
+                    snippet_bio = snip
+                self.harvest_entities(f"{s_res.get('title', '')} {snip}")
+
         # Determine existence confidence
-        exists = status in [200, 301, 302, 307] and "not found" not in title.lower() and "404" not in title.lower()
+        has_login_wall = any(w in title.lower() for w in ["log in", "login", "create an account", "redirecting"])
+        not_found = any(w in title.lower() for w in ["not found", "404", "page isn't available", "doesn't exist"])
+
+        exists = (
+            matched_search_url or
+            (status in [200, 301, 302, 307] and not not_found and (title != "" or snippet_bio != ""))
+        )
+
+        final_desc = og_desc
+        if snippet_bio:
+            if not final_desc or has_login_wall or len(snippet_bio) > len(final_desc):
+                final_desc = snippet_bio
 
         profile = {
             "platform": platform["name"],
             "category": platform["category"],
             "url": url,
-            "status": status,
+            "status": status if status else (200 if matched_search_url else 0),
             "exists": exists,
-            "title": title or og_title,
-            "description": og_desc,
+            "title": title or og_title or (f"{platform['name']} profile" if exists else ""),
+            "description": final_desc,
             "image": og_image
         }
 
@@ -302,13 +348,35 @@ class ExpedUPEngine:
         if not text:
             return
 
-        # Phone numbers (international, local 10-digit, and regional formats)
-        phones = re.findall(r'(?:\+?\d{1,3}[-\s.]?)?\(?\d{2,4}\)?[-\s.]?\d{3}[-\s.]?\d{3,4}', text)
+        # 1. WhatsApp and contact-labeled numbers (e.g., WhatsApp 0573061008, Tel: +233...)
+        labeled_phones = re.findall(
+            r'(?:whatsapp|wa\.me\/?|tel|phone|contact|call|mobile)[\s:📱📞]*(\+?[\d\s\-()]{9,18})',
+            text,
+            re.IGNORECASE
+        )
+        for lp in labeled_phones:
+            cleaned = re.sub(r'[^\d+]', '', lp)
+            if 9 <= len(cleaned) <= 15:
+                val = lp.strip().rstrip('.,;:')
+                if val not in self.results["entities"]["phones"] and cleaned not in self.results["entities"]["phones"]:
+                    self.results["entities"]["phones"].add(val)
+                    self.result_cb("entity", {"type": "phone", "value": val})
+
+        # 2. Compact 10-digit local numbers (e.g. 0573061008 in Ghana, UK 07xxx, Nigeria 080xxx)
+        compact_phones = re.findall(r'\b0[1-9]\d{8}\b', text)
+        for cp in compact_phones:
+            if cp not in self.results["entities"]["phones"]:
+                self.results["entities"]["phones"].add(cp)
+                self.result_cb("entity", {"type": "phone", "value": cp})
+
+        # 3. Standard & international formatted phones
+        phones = re.findall(r'(?:\+?\d{1,4}[\s.-]?)?(?:\(?\d{2,4}\)?[\s.-]?)?\d{3,4}[\s.-]?\d{3,4}\b', text)
         for p in phones:
             cleaned = re.sub(r'[^\d+]', '', p)
-            if 8 <= len(cleaned) <= 15:
-                p_str = p.strip()
-                if p_str not in self.results["entities"]["phones"]:
+            if 9 <= len(cleaned) <= 15:
+                p_str = p.strip().rstrip('.,;:')
+                # Avoid catching pure years or zip codes
+                if len(cleaned) >= 9 and p_str not in self.results["entities"]["phones"]:
                     self.results["entities"]["phones"].add(p_str)
                     self.result_cb("entity", {"type": "phone", "value": p_str})
 
@@ -316,7 +384,7 @@ class ExpedUPEngine:
         emails = re.findall(r'[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+', text)
         for e in emails:
             if not any(e.lower().endswith(x) for x in [".png", ".jpg", ".jpeg", ".webp", ".gif", ".svg"]):
-                e_str = e.lower().strip()
+                e_str = e.lower().strip().rstrip('.,;:')
                 if e_str not in self.results["entities"]["emails"]:
                     self.results["entities"]["emails"].add(e_str)
                     self.result_cb("entity", {"type": "email", "value": e_str})
@@ -324,7 +392,7 @@ class ExpedUPEngine:
         # Mentions (@handle)
         mentions = re.findall(r'@[a-zA-Z0-9_.-]{3,30}', text)
         for m in mentions:
-            m_str = m.strip()
+            m_str = m.strip().rstrip('.,;:')
             if m_str not in self.results["entities"]["mentions"]:
                 self.results["entities"]["mentions"].add(m_str)
                 self.result_cb("entity", {"type": "mention", "value": m_str})
@@ -332,7 +400,7 @@ class ExpedUPEngine:
         # Hashtags (#hashtag)
         hashtags = re.findall(r'#[a-zA-Z0-9_]{3,35}', text)
         for h in hashtags:
-            h_str = h.strip()
+            h_str = h.strip().rstrip('.,;:')
             if h_str not in self.results["entities"]["hashtags"]:
                 self.results["entities"]["hashtags"].add(h_str)
                 self.result_cb("entity", {"type": "hashtag", "value": h_str})
@@ -381,20 +449,20 @@ class ExpedUPEngine:
         if phone:
             queries.extend([f'"{phone}"', f"{target} {phone}"])
 
-        # Social dorks & platform discovery
+        # Natural social & discovery probes
         queries.extend([
-            f'site:instagram.com "{target}"',
-            f'site:threads.net "{target}"',
-            f'site:tiktok.com "{target}"',
-            f'site:facebook.com "{target}"',
-            f'site:linkedin.com "{target}"'
+            f'"{target}" instagram',
+            f'"{target}" tiktok',
+            f'"{target}" facebook',
+            f'"{target}" whatsapp',
+            f'"{target}" contact'
         ])
 
         platforms_to_probe = [p for p in SOCIAL_PLATFORMS if p["name"] in self.enabled_platforms]
         total_steps = len(queries) + len(platforms_to_probe) + len(self.domain_tlds)
         current_step = 0
 
-        # Phase 1: Search Engine Crawling
+        # Phase 1: Search Engine Crawling (Multi-Engine: Bing + DuckDuckGo)
         self.log(f"Phase 1/3: Launching search engine queries ({len(queries)} probes)...")
         for q in queries:
             if self.stop_requested:
@@ -403,14 +471,32 @@ class ExpedUPEngine:
             self.progress_cb(current_step, total_steps, f"Searching: {q[:32]}...")
             self.log(f"Probing search index: {q}")
 
+            # Primary: Bing
+            bing_res = self.search_bing(q)
+            self.results["search_results"].extend(bing_res)
+            time.sleep(random.uniform(self.min_delay * 0.4, self.max_delay * 0.6))
+
+            # Complementary: DuckDuckGo
             ddg_res = self.search_duckduckgo_html(q)
             self.results["search_results"].extend(ddg_res)
-            time.sleep(random.uniform(self.min_delay, self.max_delay))
+            time.sleep(random.uniform(self.min_delay * 0.4, self.max_delay * 0.6))
 
-            if deep_level == "Deep":
-                bing_res = self.search_bing(q)
-                self.results["search_results"].extend(bing_res)
-                time.sleep(random.uniform(self.min_delay * 0.8, self.max_delay * 0.9))
+        # Adaptive Pivot: If location was not specified, check if initial search discovered regional anchors
+        if not location and not self.stop_requested:
+            discovered_locs = set()
+            known_loc_tags = ["takoradi", "sekondi", "accra", "kumasi", "axim", "lagos", "london", "toronto", "atlanta", "chicago"]
+            for h in self.results["entities"]["hashtags"]:
+                h_low = h.lower()
+                for kloc in known_loc_tags:
+                    if kloc in h_low:
+                        discovered_locs.add(kloc.capitalize())
+            for dloc in list(discovered_locs)[:2]:
+                followup_q = f'"{target}" {dloc}'
+                if followup_q not in queries and not self.stop_requested:
+                    self.log(f"Adaptive Pivot: Discovered regional anchor '{dloc}', probing: {followup_q}")
+                    bing_res = self.search_bing(followup_q)
+                    self.results["search_results"].extend(bing_res)
+                    time.sleep(random.uniform(self.min_delay * 0.4, self.max_delay * 0.6))
 
         # Deduplicate search results
         seen_urls = set()
@@ -448,6 +534,25 @@ class ExpedUPEngine:
                 self.results["domains"].append(dom_res)
             time.sleep(max(0.1, self.min_delay * 0.4))
 
+        # Phase 4: Intelligence & Blueprint Synthesis
+        self.log("Phase 4/4: Synthesizing business profile, developer roadmap, and brand clearance...")
+        self.progress_cb(total_steps, total_steps, "Synthesizing Intelligence...")
+        try:
+            from intelligence_synthesizer import synthesize_intelligence
+            intelligence = synthesize_intelligence(target, self.results)
+            self.results["intelligence"] = intelligence
+
+            bp = intelligence.get("business_profile", {})
+            bc = intelligence.get("brand_clearance", {})
+            dr = intelligence.get("digital_roadmap", {})
+
+            self.log(f"[Synthesis] Brand Clearance Score: {bc.get('uniqueness_score', 0)}/100 ({bc.get('clearance_rating', '')})")
+            self.log(f"[Synthesis] Operating Base: {bp.get('operating_base', 'Undetected')}")
+            self.log(f"[Synthesis] Primary Contact: {bp.get('primary_contact', 'N/A')}")
+            self.log(f"[Synthesis] Digital Roadmap: {len(dr.get('recommended_platform_modules', []))} platform modules recommended.")
+        except Exception as syn_err:
+            self.log(f"[Synthesis] Notice: {syn_err}")
+
         elapsed = round(time.time() - start_time, 2)
         self.progress_cb(total_steps, total_steps, "Expedition Complete!")
         self.log(f"=== Expedition Complete in {elapsed}s ===")
@@ -462,8 +567,8 @@ class ExpedUPEngine:
         # Auto-export if enabled in settings
         if self.settings.get("auto_export_all", False):
             try:
-                from exporter import export_all_formats
-                export_dir = self.settings.get("export_dir", "")
+                from exporters import export_all_formats
+                export_dir = self.settings.get("export_dir", "artifacts/expeditions")
                 if export_dir:
                     exported = export_all_formats(self.results, export_dir)
                     self.log(f"[Auto-Export] Generated files in: {export_dir}")

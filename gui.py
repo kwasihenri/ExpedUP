@@ -541,6 +541,78 @@ class ExpedUPApp(ctk.CTk):
 
             self.kpi_labels[key] = val_lbl
 
+        # 6. Intelligence Highlights Panel (Brand Clearance & Developer Blueprint)
+        self.frame_intel_summary = ctk.CTkFrame(
+            self.tab_overview, corner_radius=10,
+            fg_color=THEME_COLORS["card_subtle"],
+            border_width=1, border_color=THEME_COLORS["border"]
+        )
+        self.frame_intel_summary.pack(fill="x", padx=10, pady=(0, 10))
+
+        intel_grid = ctk.CTkFrame(self.frame_intel_summary, fg_color="transparent")
+        intel_grid.pack(fill="x", padx=10, pady=10)
+        intel_grid.grid_columnconfigure(0, weight=1)
+        intel_grid.grid_columnconfigure(1, weight=1)
+
+        # Left Card: Brand Clearance & Collision Matrix (Use Case 2)
+        card_clearance = ctk.CTkFrame(
+            intel_grid, corner_radius=8,
+            fg_color=THEME_COLORS["card"],
+            border_width=1, border_color=THEME_COLORS["border"]
+        )
+        card_clearance.grid(row=0, column=0, sticky="nsew", padx=(0, 5), pady=0)
+
+        ctk.CTkLabel(
+            card_clearance, text="BRAND CLEARANCE & UNIQUENESS (FOR BRAND CREATORS)",
+            font=ctk.CTkFont(size=10, weight="bold"),
+            text_color=THEME_COLORS["primary"]
+        ).pack(anchor="w", padx=10, pady=(8, 2))
+
+        self.lbl_clearance_score = ctk.CTkLabel(
+            card_clearance, text="Uniqueness Score: --/100",
+            font=ctk.CTkFont(size=15, weight="bold"),
+            text_color=THEME_COLORS["text_primary"]
+        )
+        self.lbl_clearance_score.pack(anchor="w", padx=10, pady=(0, 2))
+
+        self.lbl_clearance_verdict = ctk.CTkLabel(
+            card_clearance, text="Launch an expedition to assess handle collisions and name availability.",
+            font=ctk.CTkFont(size=11),
+            text_color=THEME_COLORS["text_secondary"],
+            wraplength=350, justify="left", anchor="w"
+        )
+        self.lbl_clearance_verdict.pack(fill="x", padx=10, pady=(0, 8))
+
+        # Right Card: Business Profile & System Blueprint (Use Case 1)
+        card_profile = ctk.CTkFrame(
+            intel_grid, corner_radius=8,
+            fg_color=THEME_COLORS["card"],
+            border_width=1, border_color=THEME_COLORS["border"]
+        )
+        card_profile.grid(row=0, column=1, sticky="nsew", padx=(5, 0), pady=0)
+
+        ctk.CTkLabel(
+            card_profile, text="BUSINESS PROFILE & SYSTEM BLUEPRINT (FOR DEVELOPERS)",
+            font=ctk.CTkFont(size=10, weight="bold"),
+            text_color=THEME_COLORS["accent"]
+        ).pack(anchor="w", padx=10, pady=(8, 2))
+
+        self.lbl_biz_base = ctk.CTkLabel(
+            card_profile, text="Operating Base: --",
+            font=ctk.CTkFont(size=13, weight="bold"),
+            text_color=THEME_COLORS["text_primary"],
+            anchor="w"
+        )
+        self.lbl_biz_base.pack(fill="x", padx=10, pady=(0, 2))
+
+        self.lbl_biz_details = ctk.CTkLabel(
+            card_profile, text="Services, WhatsApp contacts, and architectural blueprint will be synthesized.",
+            font=ctk.CTkFont(size=11),
+            text_color=THEME_COLORS["text_secondary"],
+            wraplength=350, justify="left", anchor="w"
+        )
+        self.lbl_biz_details.pack(fill="x", padx=10, pady=(0, 8))
+
         # Live Dossier Preview Header
         preview_header_row = ctk.CTkFrame(self.tab_overview, fg_color="transparent")
         preview_header_row.pack(fill="x", padx=10, pady=(6, 4))
@@ -1896,8 +1968,49 @@ class ExpedUPApp(ctk.CTk):
         h_count = len(self.current_results["entities"]["hashtags"])
         self.kpi_labels["mentions"].configure(text=str(m_count + h_count))
 
+    def _update_intelligence_overview(self):
+        """Update the executive overview intelligence cards."""
+        try:
+            intel = self.current_results.get("intelligence")
+            if not intel:
+                from intelligence_synthesizer import synthesize_intelligence
+                target = self.current_results.get("target") or self.entry_target.get().strip() or "Target"
+                intel = synthesize_intelligence(target, self.current_results)
+                self.current_results["intelligence"] = intel
+
+            bc = intel.get("brand_clearance", {})
+            bp = intel.get("business_profile", {})
+            dr = intel.get("digital_roadmap", {})
+
+            score = bc.get("uniqueness_score", 0)
+            rating = bc.get("clearance_rating", "")
+            score_color = THEME_COLORS["success"] if score >= 80 else (THEME_COLORS["warning"] if score >= 50 else THEME_COLORS["danger"])
+            self.lbl_clearance_score.configure(
+                text=f"Score: {score}/100 — {rating}",
+                text_color=score_color
+            )
+            self.lbl_clearance_verdict.configure(
+                text=f"{bc.get('verdict', '')}\nHandles: {bc.get('handle_collision_rate', 'N/A')} | Domains: {bc.get('domain_collision_rate', 'N/A')}"
+            )
+
+            op_base = bp.get("operating_base", "Global / Digital Operations")
+            mobility = bp.get("mobility_model", "On-site")
+            services = bp.get("services", [])
+            srv_str = ", ".join([s.get("service", "") for s in services[:3]])
+            contact = bp.get("primary_contact", "N/A")
+
+            self.lbl_biz_base.configure(
+                text=f"Base: {op_base}"
+            )
+            self.lbl_biz_details.configure(
+                text=f"Mobility: {mobility}\nPrimary Contact: {contact}\nServices: {srv_str or 'General Commercial'}\nRecommended Modules: {len(dr.get('recommended_platform_modules', []))} platform components"
+            )
+        except Exception as e:
+            pass
+
     def _refresh_dossier_preview(self):
-        """Generate and display markdown dossier text."""
+        """Generate and display markdown dossier text and intelligence highlights."""
+        self._update_intelligence_overview()
         dossier_md = generate_markdown_dossier(self.current_results)
         self.txt_dossier_preview.delete("1.0", "end")
         self.txt_dossier_preview.insert("1.0", dossier_md)
@@ -1932,6 +2045,20 @@ class ExpedUPApp(ctk.CTk):
         }
         for k in self.kpi_labels:
             self.kpi_labels[k].configure(text="0")
+
+        self.lbl_clearance_score.configure(
+            text="Uniqueness Score: --/100",
+            text_color=THEME_COLORS["text_primary"]
+        )
+        self.lbl_clearance_verdict.configure(
+            text="Launch an expedition to assess handle collisions and name availability."
+        )
+        self.lbl_biz_base.configure(
+            text="Operating Base: --"
+        )
+        self.lbl_biz_details.configure(
+            text="Services, WhatsApp contacts, and architectural blueprint will be synthesized."
+        )
 
         # Clear search cards
         for widget in self.search_scroll_frame.winfo_children():
