@@ -25,9 +25,6 @@ ExpedUP is built around **two core value propositions**:
 
 ## 🖼️ Application Visual Tour
 
-> [!NOTE]
-> *Place your application screenshots into the `screenshots/` directory using the filenames specified below.*
-
 ### 1. Executive Dashboard & Live Recon Metrics
 ![ExpedUP GUI Executive Overview Dashboard](screenshots/expedup_executive_overview.png)
 *Figure 1: The dual-column CustomTkinter GUI featuring real-time KPI metric counters, status pills, and interactive parameter controls.*
@@ -196,5 +193,5 @@ Distributed under the MIT License. See [`LICENSE`](LICENSE) for more information
 ---
 
 <p center>
-Developed with ❤️ by <a href="https://github.com/kwasihenri">Kwasi Henri</a> — ExpedUP Universal Brand Intelligence Engine
+Developed by <a href="https://github.com/kwasihenri">Kwasi Henri</a> | ExpedUP Universal Brand Intelligence Engine
 </p>
