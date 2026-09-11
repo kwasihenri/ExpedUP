@@ -220,7 +220,18 @@ class ExpedUPApp(ctk.CTk):
             text_color=THEME_COLORS["text_primary"]
         )
         self.seg_depth.set(self.settings.get("default_depth", "Deep (Multi-Engine)"))
-        self.seg_depth.pack(fill="x", pady=(4, 12))
+        self.seg_depth.pack(fill="x", pady=(4, 10))
+
+        # Strict Go By Keyword Toggle (Default: OFF / False)
+        self.switch_strict_keyword = ctk.CTkSwitch(
+            scroll_sidebar,
+            text="Strict Go By Keyword",
+            font=ctk.CTkFont(size=11),
+            progress_color=THEME_COLORS["primary"],
+            text_color=THEME_COLORS["text_secondary"]
+        )
+        self.switch_strict_keyword.deselect()  # disabled by default
+        self.switch_strict_keyword.pack(fill="x", pady=(0, 10))
 
         # Advanced Anchors Toggle Button (Default: Not Shown)
         self.btn_toggle_advanced = ctk.CTkButton(
@@ -1802,6 +1813,7 @@ class ExpedUPApp(ctk.CTk):
         category = self.entry_category.get().strip()
         phone = self.entry_phone.get().strip()
         depth = "Deep" if "Deep" in self.seg_depth.get() else "Standard"
+        strict_keyword = bool(self.switch_strict_keyword.get())
 
         # Reset UI & State
         self._reset_dashboard_results()
@@ -1832,12 +1844,12 @@ class ExpedUPApp(ctk.CTk):
         # Spawn background worker thread
         self.worker_thread = threading.Thread(
             target=self._run_engine_worker,
-            args=(target, location, category, phone, depth),
+            args=(target, location, category, phone, depth, strict_keyword),
             daemon=True
         )
         self.worker_thread.start()
 
-    def _run_engine_worker(self, target: str, location: str, category: str, phone: str, depth: str):
+    def _run_engine_worker(self, target: str, location: str, category: str, phone: str, depth: str, strict_keyword: bool = False):
         """Background thread worker function."""
         try:
             results = self.engine.run_expedition(
@@ -1845,7 +1857,8 @@ class ExpedUPApp(ctk.CTk):
                 location=location,
                 category=category,
                 phone=phone,
-                deep_level=depth
+                deep_level=depth,
+                strict_keyword=strict_keyword
             )
             self.current_results = results
         except Exception as e:
@@ -2024,6 +2037,7 @@ class ExpedUPApp(ctk.CTk):
         self.entry_location.delete(0, "end")
         self.entry_category.delete(0, "end")
         self.entry_phone.delete(0, "end")
+        self.switch_strict_keyword.deselect()
 
     def _reset_dashboard_results(self):
         """Reset dashboard counters and clear container widgets."""

@@ -22,6 +22,7 @@ def run_cli(args):
     category = args.category or ""
     phone = args.phone or ""
     deep_level = "Deep" if args.deep else "Standard"
+    strict_keyword = args.strict
 
     if not target:
         print("[!] Error: Target is required. Use --target <name_or_brand>.")
@@ -39,6 +40,7 @@ def run_cli(args):
     if phone:
         print(f"Contact Anchor: {phone}")
     print(f"Depth: {deep_level}")
+    print(f"Strict Keyword: {strict_keyword}")
     print("-" * 65)
 
     def log_cb(msg):
@@ -53,7 +55,8 @@ def run_cli(args):
         location=location,
         category=category,
         phone=phone,
-        deep_level=deep_level
+        deep_level=deep_level,
+        strict_keyword=strict_keyword
     )
 
     print("\n" + "=" * 65)
@@ -105,6 +108,7 @@ def main():
     parser.add_argument("--category", type=str, help="Industry / category anchor (e.g. 'Logistics').")
     parser.add_argument("--phone", type=str, help="Seed phone number (e.g. '+44 20 7946 0919').")
     parser.add_argument("--deep", action="store_true", help="Execute multi-engine deep search (DuckDuckGo + Bing).")
+    parser.add_argument("--strict", action="store_true", help="Enforce strict keyword matching (disable loose pivots).")
     parser.add_argument("--export-all", action="store_true", help="Export Markdown, JSON, and CSV upon completion.")
     parser.add_argument("--output", type=str, default=DEFAULT_EXPORT_DIR, help="Custom export output directory.")
 

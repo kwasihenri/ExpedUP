@@ -21,6 +21,38 @@ SSL_CTX.check_hostname = False
 SSL_CTX.verify_mode = ssl.CERT_NONE
 
 
+def is_search_result_relevant(target: str, title: str, snippet: str, url: str, strict: bool = False) -> bool:
+    """
+    Verify that a search result is genuinely related to the target keyword,
+    filtering out engine fallback/trending links (e.g. iLovePDF when zero hits are found).
+    """
+    if not target:
+        return True
+
+    clean_target = re.sub(r'[^a-zA-Z0-9]', '', target.lower())
+    if not clean_target:
+        return True
+
+    combined_text = f"{title} {snippet}".lower()
+    url_lower = url.lower()
+
+    if strict:
+        # In strict mode, require exact word boundary match in title/snippet or exact slug in URL
+        word_pat = rf'\b{re.escape(clean_target)}\b'
+        if re.search(word_pat, combined_text):
+            return True
+        if clean_target in url_lower:
+            return True
+        return False
+    else:
+        # Standard mode: target or clean_target appears anywhere in title, snippet, or URL
+        if target.lower() in combined_text or clean_target in combined_text:
+            return True
+        if clean_target in url_lower:
+            return True
+        return False
+
+
 class ExpedUPEngine:
     def __init__(self, log_cb: Optional[Callable[[str], None]] = None,
                  progress_cb: Optional[Callable[[int, int, str], None]] = None,
@@ -30,6 +62,8 @@ class ExpedUPEngine:
         self.progress_cb = progress_cb or (lambda c, t, s: None)
         self.result_cb = result_cb or (lambda cat, item: None)
         self.stop_requested = False
+        self.current_target = ""
+        self.strict_keyword = False
 
         # Load engine configuration
         self.settings = dict(settings) if settings else load_settings()
@@ -126,6 +160,10 @@ class ExpedUPEngine:
                             href = urllib.parse.unquote(m_u.group(1))
 
                     if href and not href.startswith("/") and (title or snip):
+                        # Filter out irrelevant search engine filler results
+                        if not is_search_result_relevant(self.current_target, title, snip, href, self.strict_keyword):
+                            continue
+
                         item = {
                             "engine": "DuckDuckGo",
                             "query": query,
@@ -141,8 +179,6 @@ class ExpedUPEngine:
             self.log(f"DDG search notice on '{query}': {e}")
 
         return results
-
-
 
     def search_bing(self, query: str) -> List[dict]:
         """Perform search query via Bing with robust block and lineclamp parsing."""
@@ -189,6 +225,10 @@ class ExpedUPEngine:
                     snip = html.unescape(snip)
 
                     if href and not href.startswith("/") and (title or snip):
+                        # Filter out irrelevant search engine filler results
+                        if not is_search_result_relevant(self.current_target, title, snip, href, self.strict_keyword):
+                            continue
+
                         item = {
                             "engine": "Bing",
                             "query": query,
@@ -221,6 +261,7 @@ class ExpedUPEngine:
         og_title = ""
         og_desc = ""
         og_image = ""
+        html = ""
 
         try:
             with urllib.request.urlopen(req, context=SSL_CTX, timeout=self.timeout) as resp:
@@ -268,13 +309,57 @@ class ExpedUPEngine:
                 self.harvest_entities(f"{s_res.get('title', '')} {snip}")
 
         # Determine existence confidence
-        has_login_wall = any(w in title.lower() for w in ["log in", "login", "create an account", "redirecting"])
-        not_found = any(w in title.lower() for w in ["not found", "404", "page isn't available", "doesn't exist"])
+        plat_key = platform["name"].lower()
+        title_lower = title.strip().lower()
+        og_title_lower = og_title.strip().lower()
+        og_desc_lower = og_desc.strip().lower()
 
-        exists = (
-            matched_search_url or
-            (status in [200, 301, 302, 307] and not not_found and (title != "" or snippet_bio != ""))
+        # Specific platform generic landing page / login-wall detection
+        is_generic_title = False
+        if "instagram" in plat_key:
+            if title_lower in ["instagram", "log in • instagram", "login • instagram", "create an account or log in to instagram", "login on instagram", "instagram post"] or "log in" in title_lower:
+                is_generic_title = True
+        elif "threads" in plat_key:
+            if title_lower in ["threads", "log in • threads", "login • threads", "threads • log in"] or "log in" in title_lower or title_lower == "threads":
+                is_generic_title = True
+        elif "tiktok" in plat_key:
+            if "make your day" in title_lower or title_lower in ["tiktok", "tiktok - make your day"]:
+                is_generic_title = True
+        elif "reddit" in plat_key:
+            if title_lower in ["reddit", "reddit - dive into anything", "reddit - explore anything"]:
+                is_generic_title = True
+        elif "telegram" in plat_key:
+            # Telegram displays a placeholder page for unclaimed handles with title 'Telegram: Contact @...' and no tgme_page_extra
+            if ("tgme_page_extra" not in html) and (title_lower.startswith("telegram: contact @") or "if you have telegram, you can contact @" in html.lower()):
+                is_generic_title = True
+        elif "facebook" in plat_key:
+            if title_lower in ["facebook", "log in to facebook", "log into facebook"] or "log in" in title_lower:
+                is_generic_title = True
+        elif "pinterest" in plat_key:
+            if title_lower in ["pinterest", "explore", ""]:
+                is_generic_title = True
+
+        has_login_wall = any(w in title_lower for w in ["log in", "login", "create an account", "redirecting"])
+        not_found = any(w in title_lower or w in og_title_lower or w in og_desc_lower for w in [
+            "not found", "404", "page isn't available", "doesn't exist",
+            "user not found", "nobody on reddit goes by that name",
+            "this account doesn't exist", "sorry, this page isn't available"
+        ])
+
+        has_target_mention = (
+            clean_target in title_lower or
+            clean_target in og_title_lower or
+            clean_target in og_desc_lower
         )
+
+        exists = False
+        if matched_search_url:
+            exists = True
+        elif status in [200, 301, 302, 307] and not not_found and not is_generic_title:
+            if has_target_mention:
+                exists = True
+            elif plat_key in ["github", "linkedin company", "youtube", "twitter / x"]:
+                exists = True
 
         final_desc = og_desc
         if snippet_bio:
@@ -288,8 +373,8 @@ class ExpedUPEngine:
             "status": status if status else (200 if matched_search_url else 0),
             "exists": exists,
             "title": title or og_title or (f"{platform['name']} profile" if exists else ""),
-            "description": final_desc,
-            "image": og_image
+            "description": final_desc if exists else "",
+            "image": og_image if exists else ""
         }
 
         if exists:
@@ -409,9 +494,12 @@ class ExpedUPEngine:
     # 5. Master Expedition Runner
     # ---------------------------------------------------------
     def run_expedition(self, target: str, location: str = "", category: str = "",
-                       phone: str = "", deep_level: str = "Standard") -> dict:
+                       phone: str = "", deep_level: str = "Standard",
+                       strict_keyword: bool = False) -> dict:
         """Run the complete multi-source intelligence expedition pipeline."""
         self.stop_requested = False
+        self.current_target = target
+        self.strict_keyword = strict_keyword
         start_time = time.time()
         self.results["target"] = target
         self.results["location"] = location
@@ -420,6 +508,8 @@ class ExpedUPEngine:
         self.results["timestamp"] = time.strftime("%Y-%m-%d %H:%M:%S")
 
         self.log(f"=== Starting ExpedUP Expedition for: '{target}' ===")
+        if strict_keyword:
+            self.log("[Mode] Strict Go By Keyword ENABLED (Exact matches only; loose pivots suppressed)")
         if location:
             self.log(f"Location anchor: {location}")
         if category:
@@ -427,36 +517,53 @@ class ExpedUPEngine:
         if phone:
             self.log(f"Contact anchor: {phone}")
 
-        # Build comprehensive multi-axis query matrix
-        queries = [
-            target,
-            f'"{target}"'
-        ]
-        if location:
-            queries.extend([f"{target} {location}", f'"{target}" "{location}"'])
-            for loc_part in location.split(","):
-                part = loc_part.strip()
-                if part and f'"{target}" {part}' not in queries:
-                    queries.append(f'"{target}" {part}')
+        # Build query matrix
+        if strict_keyword:
+            # Strict mode: Only exact quoted queries to prevent search engine drift
+            queries = [
+                f'"{target}"',
+                f'"{target}" instagram',
+                f'"{target}" tiktok',
+                f'"{target}" facebook',
+                f'"{target}" contact'
+            ]
+            if location:
+                queries.append(f'"{target}" "{location}"')
+            if category:
+                queries.append(f'"{target}" "{category}"')
+            if phone:
+                queries.append(f'"{target}" "{phone}"')
+        else:
+            # Standard comprehensive multi-axis query matrix
+            queries = [
+                target,
+                f'"{target}"'
+            ]
+            if location:
+                queries.extend([f"{target} {location}", f'"{target}" "{location}"'])
+                for loc_part in location.split(","):
+                    part = loc_part.strip()
+                    if part and f'"{target}" {part}' not in queries:
+                        queries.append(f'"{target}" {part}')
 
-        if category:
-            queries.extend([f"{target} {category}", f'"{target}" {category}'])
-            for cat_word in category.replace("&", " ").split():
-                w = cat_word.strip()
-                if len(w) > 3 and f'"{target}" {w}' not in queries:
-                    queries.append(f'"{target}" {w}')
+            if category:
+                queries.extend([f"{target} {category}", f'"{target}" {category}'])
+                for cat_word in category.replace("&", " ").split():
+                    w = cat_word.strip()
+                    if len(w) > 3 and f'"{target}" {w}' not in queries:
+                        queries.append(f'"{target}" {w}')
 
-        if phone:
-            queries.extend([f'"{phone}"', f"{target} {phone}"])
+            if phone:
+                queries.extend([f'"{phone}"', f"{target} {phone}"])
 
-        # Natural social & discovery probes
-        queries.extend([
-            f'"{target}" instagram',
-            f'"{target}" tiktok',
-            f'"{target}" facebook',
-            f'"{target}" whatsapp',
-            f'"{target}" contact'
-        ])
+            # Natural social & discovery probes
+            queries.extend([
+                f'"{target}" instagram',
+                f'"{target}" tiktok',
+                f'"{target}" facebook',
+                f'"{target}" whatsapp',
+                f'"{target}" contact'
+            ])
 
         platforms_to_probe = [p for p in SOCIAL_PLATFORMS if p["name"] in self.enabled_platforms]
         total_steps = len(queries) + len(platforms_to_probe) + len(self.domain_tlds)
@@ -481,8 +588,8 @@ class ExpedUPEngine:
             self.results["search_results"].extend(ddg_res)
             time.sleep(random.uniform(self.min_delay * 0.4, self.max_delay * 0.6))
 
-        # Adaptive Pivot: If location was not specified, check if initial search discovered regional anchors
-        if not location and not self.stop_requested:
+        # Adaptive Pivot: If location was not specified and not in strict mode, check if initial search discovered regional anchors
+        if not location and not strict_keyword and not self.stop_requested:
             discovered_locs = set()
             known_loc_tags = ["takoradi", "sekondi", "accra", "kumasi", "axim", "lagos", "london", "toronto", "atlanta", "chicago"]
             for h in self.results["entities"]["hashtags"]:
