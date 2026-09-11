@@ -13,6 +13,7 @@ import socket
 import random
 from typing import Dict, List, Callable, Optional
 from config import USER_AGENTS, SOCIAL_PLATFORMS, DOMAIN_TLDS
+from settings_manager import load_settings
 
 # Configure permissive SSL context for reconnaissance
 SSL_CTX = ssl.create_default_context()
@@ -23,11 +24,21 @@ SSL_CTX.verify_mode = ssl.CERT_NONE
 class ExpedUPEngine:
     def __init__(self, log_cb: Optional[Callable[[str], None]] = None,
                  progress_cb: Optional[Callable[[int, int, str], None]] = None,
-                 result_cb: Optional[Callable[[str, dict], None]] = None):
+                 result_cb: Optional[Callable[[str, dict], None]] = None,
+                 settings: Optional[dict] = None):
         self.log_cb = log_cb or (lambda msg: None)
         self.progress_cb = progress_cb or (lambda c, t, s: None)
         self.result_cb = result_cb or (lambda cat, item: None)
         self.stop_requested = False
+
+        # Load engine configuration
+        self.settings = dict(settings) if settings else load_settings()
+        self.timeout = int(self.settings.get("request_timeout", 12))
+        self.min_delay = float(self.settings.get("min_delay", 0.8))
+        self.max_delay = float(self.settings.get("max_delay", 1.4))
+        self.ua_rotation = bool(self.settings.get("user_agent_rotation", True))
+        self.enabled_platforms = set(self.settings.get("enabled_platforms", [p["name"] for p in SOCIAL_PLATFORMS]))
+        self.domain_tlds = list(self.settings.get("domain_tlds", DOMAIN_TLDS))
 
         # Results storage
         self.results = {
@@ -60,9 +71,10 @@ class ExpedUPEngine:
         self.log_cb(formatted)
 
     def get_headers(self) -> dict:
-        """Return headers with a randomized modern user agent."""
+        """Return headers with modern user agent (randomized if rotation enabled)."""
+        ua = random.choice(USER_AGENTS) if self.ua_rotation else USER_AGENTS[0]
         return {
-            "User-Agent": random.choice(USER_AGENTS),
+            "User-Agent": ua,
             "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
             "Accept-Language": "en-US,en;q=0.9",
             "Cache-Control": "no-cache",
@@ -82,7 +94,7 @@ class ExpedUPEngine:
         results = []
 
         try:
-            with urllib.request.urlopen(req, context=SSL_CTX, timeout=12) as resp:
+            with urllib.request.urlopen(req, context=SSL_CTX, timeout=self.timeout) as resp:
                 html = resp.read().decode("utf-8", errors="ignore")
 
                 # Extract all titles & links
@@ -145,7 +157,7 @@ class ExpedUPEngine:
         results = []
 
         try:
-            with urllib.request.urlopen(req, context=SSL_CTX, timeout=12) as resp:
+            with urllib.request.urlopen(req, context=SSL_CTX, timeout=self.timeout) as resp:
                 html = resp.read().decode("utf-8", errors="ignore")
                 blocks = html.split('<li class="b_algo"')
                 for b in blocks[1:]:
@@ -191,7 +203,7 @@ class ExpedUPEngine:
         og_image = ""
 
         try:
-            with urllib.request.urlopen(req, context=SSL_CTX, timeout=10) as resp:
+            with urllib.request.urlopen(req, context=SSL_CTX, timeout=self.timeout) as resp:
                 status = resp.getcode()
                 html = resp.read().decode("utf-8", errors="ignore")
 
@@ -260,7 +272,7 @@ class ExpedUPEngine:
             url = f"https://{domain_name}"
             req = urllib.request.Request(url, headers=self.get_headers())
             try:
-                with urllib.request.urlopen(req, context=SSL_CTX, timeout=8) as resp:
+                with urllib.request.urlopen(req, context=SSL_CTX, timeout=self.timeout) as resp:
                     http_code = resp.getcode()
                     html = resp.read(20480).decode("utf-8", errors="ignore")
                     m_t = re.search(r"<title[^>]*>(.*?)</title>", html, re.IGNORECASE | re.DOTALL)
@@ -378,7 +390,8 @@ class ExpedUPEngine:
             f'site:linkedin.com "{target}"'
         ])
 
-        total_steps = len(queries) + len(SOCIAL_PLATFORMS) + len(DOMAIN_TLDS)
+        platforms_to_probe = [p for p in SOCIAL_PLATFORMS if p["name"] in self.enabled_platforms]
+        total_steps = len(queries) + len(platforms_to_probe) + len(self.domain_tlds)
         current_step = 0
 
         # Phase 1: Search Engine Crawling
@@ -392,12 +405,12 @@ class ExpedUPEngine:
 
             ddg_res = self.search_duckduckgo_html(q)
             self.results["search_results"].extend(ddg_res)
-            time.sleep(random.uniform(0.8, 1.4))
+            time.sleep(random.uniform(self.min_delay, self.max_delay))
 
             if deep_level == "Deep":
                 bing_res = self.search_bing(q)
                 self.results["search_results"].extend(bing_res)
-                time.sleep(random.uniform(0.6, 1.2))
+                time.sleep(random.uniform(self.min_delay * 0.8, self.max_delay * 0.9))
 
         # Deduplicate search results
         seen_urls = set()
@@ -409,8 +422,8 @@ class ExpedUPEngine:
         self.results["search_results"] = dedup_search
 
         # Phase 2: Social Media Platform Verification
-        self.log(f"Phase 2/3: Probing {len(SOCIAL_PLATFORMS)} social media platforms...")
-        for plat in SOCIAL_PLATFORMS:
+        self.log(f"Phase 2/3: Probing {len(platforms_to_probe)} enabled social platforms...")
+        for plat in platforms_to_probe:
             if self.stop_requested:
                 break
             current_step += 1
@@ -419,12 +432,12 @@ class ExpedUPEngine:
             prof = self.probe_social_profile(plat, target)
             if prof:
                 self.results["social_profiles"].append(prof)
-            time.sleep(random.uniform(0.6, 1.2))
+            time.sleep(random.uniform(self.min_delay * 0.75, self.max_delay * 0.85))
 
         # Phase 3: Domain & DNS Reconnaissance
-        self.log(f"Phase 3/3: Probing domain names and DNS records...")
+        self.log(f"Phase 3/3: Probing domain names and DNS records ({len(self.domain_tlds)} TLDs)...")
         clean_target = re.sub(r'[^a-zA-Z0-9-]', '', target.lower())
-        for tld in DOMAIN_TLDS:
+        for tld in self.domain_tlds:
             if self.stop_requested:
                 break
             current_step += 1
@@ -433,15 +446,28 @@ class ExpedUPEngine:
             dom_res = self.probe_domain(domain)
             if dom_res:
                 self.results["domains"].append(dom_res)
-            time.sleep(0.3)
+            time.sleep(max(0.1, self.min_delay * 0.4))
 
         elapsed = round(time.time() - start_time, 2)
         self.progress_cb(total_steps, total_steps, "Expedition Complete!")
         self.log(f"=== Expedition Complete in {elapsed}s ===")
+        active_socials = len([p for p in self.results['social_profiles'] if p.get('exists')])
+        reg_domains = len([d for d in self.results['domains'] if d.get('is_registered')])
         self.log(f"Discovered: {len(self.results['search_results'])} search links, "
-                 f"{len([p for p in self.results['social_profiles'] if p.get('exists')])} active social profiles, "
-                 f"{len([d for d in self.results['domains'] if d.get('is_registered')])} registered domains, "
+                 f"{active_socials} active social profiles, "
+                 f"{reg_domains} registered domains, "
                  f"{len(self.results['entities']['phones'])} phone numbers, "
                  f"{len(self.results['entities']['emails'])} emails.")
+
+        # Auto-export if enabled in settings
+        if self.settings.get("auto_export_all", False):
+            try:
+                from exporter import export_all_formats
+                export_dir = self.settings.get("export_dir", "")
+                if export_dir:
+                    exported = export_all_formats(self.results, export_dir)
+                    self.log(f"[Auto-Export] Generated files in: {export_dir}")
+            except Exception as exp_err:
+                self.log(f"[Auto-Export] Warning: {exp_err}")
 
         return self.results

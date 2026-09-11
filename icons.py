@@ -65,8 +65,12 @@ _ALIASES = {
     "circle": "circle.png",
     "pending": "circle.png",
     "check": "check.png",
-    "refresh": "refresh.png"
+    "refresh": "refresh.png",
+    "settings": "settings.png",
+    "gear": "settings.png",
+    "config": "settings.png"
 }
+
 
 def _hex_to_rgb(hex_color: str) -> Tuple[int, int, int]:
     """Convert hex string (e.g. #00FFCC or 00FFCC) to (R, G, B) tuple."""

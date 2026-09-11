@@ -9,7 +9,7 @@ import sys
 import threading
 import webbrowser
 import tkinter as tk
-from tkinter import messagebox
+from tkinter import messagebox, filedialog
 from typing import Dict, Any, Optional
 
 import customtkinter as ctk
@@ -17,7 +17,7 @@ import customtkinter as ctk
 from config import (
     APP_NAME, APP_SUBTITLE, VERSION, THEME_COLORS,
     DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT, MIN_WINDOW_WIDTH, MIN_WINDOW_HEIGHT,
-    DEFAULT_EXPORT_DIR
+    DEFAULT_EXPORT_DIR, SOCIAL_PLATFORMS, DOMAIN_TLDS
 )
 from expedup_engine import ExpedUPEngine
 from exporters import (
@@ -25,6 +25,7 @@ from exporters import (
     export_json_file, export_csv_file, export_all_formats
 )
 from icons import get_icon
+from settings_manager import load_settings, save_settings, reset_to_defaults
 
 # Configure light appearance by default (Vectihost & Selligine design system)
 ctk.set_appearance_mode("Light")
@@ -34,6 +35,11 @@ ctk.set_default_color_theme("blue")
 class ExpedUPApp(ctk.CTk):
     def __init__(self):
         super().__init__()
+
+        # Load Persistent Settings
+        self.settings = load_settings()
+        saved_theme = self.settings.get("theme", "Light")
+        ctk.set_appearance_mode(saved_theme)
 
         # Window Configuration
         self.title(f"{APP_NAME} v{VERSION} — Universal OSINT & Brand Reconnaissance Engine")
@@ -137,14 +143,19 @@ class ExpedUPApp(ctk.CTk):
         self.status_pill.pack(side="left", padx=(0, 15))
 
         # Appearance Toggle (Light default -> Dark)
+        current_theme = self.settings.get("theme", "Light")
         self.appearance_switch = ctk.CTkSwitch(
             controls_box,
-            text="Dark Mode",
+            text="Dark Mode" if current_theme == "Dark" else "Light Mode",
             command=self._toggle_appearance,
             font=ctk.CTkFont(size=12),
             progress_color=THEME_COLORS["primary"],
             onvalue="Dark", offvalue="Light"
         )
+        if current_theme == "Dark":
+            self.appearance_switch.select()
+        else:
+            self.appearance_switch.deselect()
         self.appearance_switch.pack(side="left")
 
     def _build_main_layout(self):
@@ -208,7 +219,7 @@ class ExpedUPApp(ctk.CTk):
             unselected_hover_color=THEME_COLORS["secondary_hover"],
             text_color=THEME_COLORS["text_primary"]
         )
-        self.seg_depth.set("Deep (Multi-Engine)")
+        self.seg_depth.set(self.settings.get("default_depth", "Deep (Multi-Engine)"))
         self.seg_depth.pack(fill="x", pady=(4, 12))
 
         # Advanced Anchors Toggle Button (Default: Not Shown)
@@ -467,12 +478,14 @@ class ExpedUPApp(ctk.CTk):
         self.tab_social = self.tabview.add("Social Identities")
         self.tab_entities = self.tabview.add("Discovered Entities")
         self.tab_console = self.tabview.add("Live Recon Console")
+        self.tab_settings = self.tabview.add("Engine Settings")
 
         self._build_tab_overview()
         self._build_tab_search()
         self._build_tab_social()
         self._build_tab_entities()
         self._build_tab_console()
+        self._build_tab_settings()
 
     # -------------------------------------------------------------------------
     # Tab 1: Executive Overview & Live KPI Grid
@@ -1071,6 +1084,639 @@ class ExpedUPApp(ctk.CTk):
         self.txt_console.insert("end", "[EXPEDUP SYSTEM] OSINT Reconnaissance Console Initialized.\n")
 
     # -------------------------------------------------------------------------
+    # Tab 6: Engine & Application Settings
+    # -------------------------------------------------------------------------
+    def _build_tab_settings(self):
+        """Construct the configuration and preferences dashboard."""
+        scroll_settings = ctk.CTkScrollableFrame(
+            self.tab_settings, fg_color="transparent",
+            scrollbar_button_color=THEME_COLORS["border"]
+        )
+        scroll_settings.pack(fill="both", expand=True, padx=12, pady=10)
+
+        # Header Title Banner
+        banner = ctk.CTkFrame(
+            scroll_settings, corner_radius=10,
+            fg_color=THEME_COLORS["card_subtle"],
+            border_width=1, border_color=THEME_COLORS["border"]
+        )
+        banner.pack(fill="x", pady=(0, 14))
+
+        banner_inner = ctk.CTkFrame(banner, fg_color="transparent")
+        banner_inner.pack(fill="x", padx=16, pady=12)
+
+        title_row = ctk.CTkFrame(banner_inner, fg_color="transparent")
+        title_row.pack(fill="x")
+
+        icon_lbl = ctk.CTkLabel(
+            title_row, text="",
+            image=self._get_icon("settings", (20, 20), THEME_COLORS["primary"])
+        )
+        icon_lbl.pack(side="left", padx=(0, 8))
+
+        ctk.CTkLabel(
+            title_row,
+            text="EXPEDUP ENGINE & ENVIRONMENT CONFIGURATION",
+            font=ctk.CTkFont(size=14, weight="bold"),
+            text_color=THEME_COLORS["text_primary"]
+        ).pack(side="left")
+
+        ctk.CTkLabel(
+            banner_inner,
+            text="Fine-tune network evasion, reconnaissance depth, target platforms, storage paths, and auto-export behavior.",
+            font=ctk.CTkFont(size=11),
+            text_color=THEME_COLORS["text_secondary"]
+        ).pack(anchor="w", pady=(4, 0))
+
+        # ---------------------------------------------------------------------
+        # 1. Interface & Workflow Card
+        # ---------------------------------------------------------------------
+        card_general = ctk.CTkFrame(
+            scroll_settings, corner_radius=10,
+            fg_color=THEME_COLORS["card_subtle"],
+            border_width=1, border_color=THEME_COLORS["border"]
+        )
+        card_general.pack(fill="x", pady=(0, 14))
+
+        inner_general = ctk.CTkFrame(card_general, fg_color="transparent")
+        inner_general.pack(fill="x", padx=16, pady=14)
+
+        sec_header1 = ctk.CTkFrame(inner_general, fg_color="transparent")
+        sec_header1.pack(fill="x", pady=(0, 10))
+        ctk.CTkLabel(
+            sec_header1, text="",
+            image=self._get_icon("target", (16, 16), THEME_COLORS["primary"])
+        ).pack(side="left", padx=(0, 6))
+        ctk.CTkLabel(
+            sec_header1, text="INTERFACE & WORKFLOW",
+            font=ctk.CTkFont(size=12, weight="bold"),
+            text_color=THEME_COLORS["primary"]
+        ).pack(side="left")
+
+        grid_gen = ctk.CTkFrame(inner_general, fg_color="transparent")
+        grid_gen.pack(fill="x")
+        grid_gen.grid_columnconfigure(0, weight=1)
+        grid_gen.grid_columnconfigure(1, weight=1)
+
+        # Theme selection
+        box_theme = ctk.CTkFrame(grid_gen, fg_color="transparent")
+        box_theme.grid(row=0, column=0, sticky="nsew", padx=(0, 10))
+        ctk.CTkLabel(
+            box_theme, text="Interface Appearance Theme",
+            font=ctk.CTkFont(size=11, weight="bold"),
+            text_color=THEME_COLORS["text_primary"]
+        ).pack(anchor="w", pady=(0, 4))
+        ctk.CTkLabel(
+            box_theme, text="Choose default visual appearance (Light default, dual-token contrast).",
+            font=ctk.CTkFont(size=10), text_color=THEME_COLORS["text_secondary"]
+        ).pack(anchor="w", pady=(0, 6))
+
+        self.setting_var_theme = ctk.StringVar(value=self.settings.get("theme", "Light"))
+        self.seg_setting_theme = ctk.CTkSegmentedButton(
+            box_theme, values=["Light", "Dark"],
+            variable=self.setting_var_theme,
+            command=self._on_setting_theme_change,
+            selected_color=THEME_COLORS["primary"],
+            selected_hover_color=THEME_COLORS["primary_hover"],
+            unselected_color=THEME_COLORS["card"],
+            unselected_hover_color=THEME_COLORS["secondary_hover"],
+            text_color=THEME_COLORS["text_primary"]
+        )
+        self.seg_setting_theme.pack(fill="x")
+
+        # Default Depth selection
+        box_depth = ctk.CTkFrame(grid_gen, fg_color="transparent")
+        box_depth.grid(row=0, column=1, sticky="nsew", padx=(10, 0))
+        ctk.CTkLabel(
+            box_depth, text="Default Reconnaissance Depth",
+            font=ctk.CTkFont(size=11, weight="bold"),
+            text_color=THEME_COLORS["text_primary"]
+        ).pack(anchor="w", pady=(0, 4))
+        ctk.CTkLabel(
+            box_depth, text="Standard performs fast single-index scan; Deep engages Bing & cross-engines.",
+            font=ctk.CTkFont(size=10), text_color=THEME_COLORS["text_secondary"]
+        ).pack(anchor="w", pady=(0, 6))
+
+        self.setting_var_depth = ctk.StringVar(value=self.settings.get("default_depth", "Deep (Multi-Engine)"))
+        self.seg_setting_depth = ctk.CTkSegmentedButton(
+            box_depth, values=["Standard", "Deep (Multi-Engine)"],
+            variable=self.setting_var_depth,
+            selected_color=THEME_COLORS["primary"],
+            selected_hover_color=THEME_COLORS["primary_hover"],
+            unselected_color=THEME_COLORS["card"],
+            unselected_hover_color=THEME_COLORS["secondary_hover"],
+            text_color=THEME_COLORS["text_primary"]
+        )
+        self.seg_setting_depth.pack(fill="x")
+
+        # ---------------------------------------------------------------------
+        # 2. Dossier Storage & Auto-Export Card
+        # ---------------------------------------------------------------------
+        card_storage = ctk.CTkFrame(
+            scroll_settings, corner_radius=10,
+            fg_color=THEME_COLORS["card_subtle"],
+            border_width=1, border_color=THEME_COLORS["border"]
+        )
+        card_storage.pack(fill="x", pady=(0, 14))
+
+        inner_storage = ctk.CTkFrame(card_storage, fg_color="transparent")
+        inner_storage.pack(fill="x", padx=16, pady=14)
+
+        sec_header2 = ctk.CTkFrame(inner_storage, fg_color="transparent")
+        sec_header2.pack(fill="x", pady=(0, 10))
+        ctk.CTkLabel(
+            sec_header2, text="",
+            image=self._get_icon("folder", (16, 16), THEME_COLORS["primary"])
+        ).pack(side="left", padx=(0, 6))
+        ctk.CTkLabel(
+            sec_header2, text="DOSSIER STORAGE & AUTO-EXPORT",
+            font=ctk.CTkFont(size=12, weight="bold"),
+            text_color=THEME_COLORS["primary"]
+        ).pack(side="left")
+
+        ctk.CTkLabel(
+            inner_storage, text="Default Export Directory",
+            font=ctk.CTkFont(size=11, weight="bold"),
+            text_color=THEME_COLORS["text_primary"]
+        ).pack(anchor="w")
+
+        dir_row = ctk.CTkFrame(inner_storage, fg_color="transparent")
+        dir_row.pack(fill="x", pady=(4, 10))
+
+        self.setting_var_export_dir = ctk.StringVar(value=self.settings.get("export_dir", DEFAULT_EXPORT_DIR))
+        self.entry_setting_export_dir = ctk.CTkEntry(
+            dir_row, textvariable=self.setting_var_export_dir,
+            height=34, fg_color=THEME_COLORS["input_bg"],
+            border_color=THEME_COLORS["border"],
+            text_color=THEME_COLORS["text_primary"]
+        )
+        self.entry_setting_export_dir.pack(side="left", fill="x", expand=True, padx=(0, 8))
+
+        ctk.CTkButton(
+            dir_row, text="  Browse Folder...",
+            image=self._get_icon("folder", (14, 14), THEME_COLORS["secondary_text"]),
+            compound="left",
+            command=self._browse_export_dir,
+            height=34, width=140,
+            fg_color=THEME_COLORS["secondary"],
+            hover_color=THEME_COLORS["secondary_hover"],
+            text_color=THEME_COLORS["secondary_text"],
+            border_width=1, border_color=THEME_COLORS["border"],
+            font=ctk.CTkFont(size=11)
+        ).pack(side="right")
+
+        # Auto-export toggle
+        self.setting_var_auto_export = ctk.BooleanVar(value=bool(self.settings.get("auto_export_all", False)))
+        self.switch_setting_auto_export = ctk.CTkSwitch(
+            inner_storage,
+            text="Automatically export full dossier suite (Markdown, CSV, JSON) upon expedition completion",
+            variable=self.setting_var_auto_export,
+            font=ctk.CTkFont(size=11),
+            progress_color=THEME_COLORS["primary"]
+        )
+        self.switch_setting_auto_export.pack(anchor="w", pady=(2, 0))
+
+        # ---------------------------------------------------------------------
+        # 3. Stealth, Rate Limiting & Evasion Card
+        # ---------------------------------------------------------------------
+        card_stealth = ctk.CTkFrame(
+            scroll_settings, corner_radius=10,
+            fg_color=THEME_COLORS["card_subtle"],
+            border_width=1, border_color=THEME_COLORS["border"]
+        )
+        card_stealth.pack(fill="x", pady=(0, 14))
+
+        inner_stealth = ctk.CTkFrame(card_stealth, fg_color="transparent")
+        inner_stealth.pack(fill="x", padx=16, pady=14)
+
+        sec_header3 = ctk.CTkFrame(inner_stealth, fg_color="transparent")
+        sec_header3.pack(fill="x", pady=(0, 10))
+        ctk.CTkLabel(
+            sec_header3, text="",
+            image=self._get_icon("bolt", (16, 16), THEME_COLORS["primary"])
+        ).pack(side="left", padx=(0, 6))
+        ctk.CTkLabel(
+            sec_header3, text="STEALTH, NETWORK & EVASION",
+            font=ctk.CTkFont(size=12, weight="bold"),
+            text_color=THEME_COLORS["primary"]
+        ).pack(side="left")
+
+        grid_sliders = ctk.CTkFrame(inner_stealth, fg_color="transparent")
+        grid_sliders.pack(fill="x", pady=(0, 10))
+        grid_sliders.grid_columnconfigure((0, 1, 2), weight=1)
+
+        # Timeout slider
+        box_timeout = ctk.CTkFrame(grid_sliders, fg_color="transparent")
+        box_timeout.grid(row=0, column=0, sticky="nsew", padx=(0, 8))
+        lbl_to_row = ctk.CTkFrame(box_timeout, fg_color="transparent")
+        lbl_to_row.pack(fill="x")
+        ctk.CTkLabel(
+            lbl_to_row, text="Request Timeout",
+            font=ctk.CTkFont(size=11, weight="bold"),
+            text_color=THEME_COLORS["text_primary"]
+        ).pack(side="left")
+        self.lbl_timeout_val = ctk.CTkLabel(
+            lbl_to_row, text=f"{int(self.settings.get('request_timeout', 12))}s",
+            font=ctk.CTkFont(size=11, weight="bold"),
+            text_color=THEME_COLORS["primary"]
+        )
+        self.lbl_timeout_val.pack(side="right")
+
+        self.slider_timeout = ctk.CTkSlider(
+            box_timeout, from_=3, to=30, number_of_steps=27,
+            command=self._on_timeout_slider_change,
+            progress_color=THEME_COLORS["primary"],
+            button_color=THEME_COLORS["primary"],
+            button_hover_color=THEME_COLORS["primary_hover"]
+        )
+        self.slider_timeout.set(int(self.settings.get("request_timeout", 12)))
+        self.slider_timeout.pack(fill="x", pady=(6, 0))
+
+        # Min delay slider
+        box_min_delay = ctk.CTkFrame(grid_sliders, fg_color="transparent")
+        box_min_delay.grid(row=0, column=1, sticky="nsew", padx=(4, 4))
+        lbl_min_row = ctk.CTkFrame(box_min_delay, fg_color="transparent")
+        lbl_min_row.pack(fill="x")
+        ctk.CTkLabel(
+            lbl_min_row, text="Min Query Delay",
+            font=ctk.CTkFont(size=11, weight="bold"),
+            text_color=THEME_COLORS["text_primary"]
+        ).pack(side="left")
+        self.lbl_min_delay_val = ctk.CTkLabel(
+            lbl_min_row, text=f"{float(self.settings.get('min_delay', 0.8)):.1f}s",
+            font=ctk.CTkFont(size=11, weight="bold"),
+            text_color=THEME_COLORS["primary"]
+        )
+        self.lbl_min_delay_val.pack(side="right")
+
+        self.slider_min_delay = ctk.CTkSlider(
+            box_min_delay, from_=0.1, to=3.0, number_of_steps=29,
+            command=self._on_min_delay_slider_change,
+            progress_color=THEME_COLORS["primary"],
+            button_color=THEME_COLORS["primary"],
+            button_hover_color=THEME_COLORS["primary_hover"]
+        )
+        self.slider_min_delay.set(float(self.settings.get("min_delay", 0.8)))
+        self.slider_min_delay.pack(fill="x", pady=(6, 0))
+
+        # Max delay slider
+        box_max_delay = ctk.CTkFrame(grid_sliders, fg_color="transparent")
+        box_max_delay.grid(row=0, column=2, sticky="nsew", padx=(8, 0))
+        lbl_max_row = ctk.CTkFrame(box_max_delay, fg_color="transparent")
+        lbl_max_row.pack(fill="x")
+        ctk.CTkLabel(
+            lbl_max_row, text="Max Query Delay",
+            font=ctk.CTkFont(size=11, weight="bold"),
+            text_color=THEME_COLORS["text_primary"]
+        ).pack(side="left")
+        self.lbl_max_delay_val = ctk.CTkLabel(
+            lbl_max_row, text=f"{float(self.settings.get('max_delay', 1.4)):.1f}s",
+            font=ctk.CTkFont(size=11, weight="bold"),
+            text_color=THEME_COLORS["primary"]
+        )
+        self.lbl_max_delay_val.pack(side="right")
+
+        self.slider_max_delay = ctk.CTkSlider(
+            box_max_delay, from_=0.5, to=5.0, number_of_steps=45,
+            command=self._on_max_delay_slider_change,
+            progress_color=THEME_COLORS["primary"],
+            button_color=THEME_COLORS["primary"],
+            button_hover_color=THEME_COLORS["primary_hover"]
+        )
+        self.slider_max_delay.set(float(self.settings.get("max_delay", 1.4)))
+        self.slider_max_delay.pack(fill="x", pady=(6, 0))
+
+        # User-Agent rotation switch
+        self.setting_var_ua_rotation = ctk.BooleanVar(value=bool(self.settings.get("user_agent_rotation", True)))
+        self.switch_setting_ua_rotation = ctk.CTkSwitch(
+            inner_stealth,
+            text="Rotate modern browser User-Agent fingerprints per probe to minimize anti-bot triggers",
+            variable=self.setting_var_ua_rotation,
+            font=ctk.CTkFont(size=11),
+            progress_color=THEME_COLORS["primary"]
+        )
+        self.switch_setting_ua_rotation.pack(anchor="w", pady=(8, 0))
+
+        # ---------------------------------------------------------------------
+        # 4. Social Platform Coverage Matrix Card
+        # ---------------------------------------------------------------------
+        card_platforms = ctk.CTkFrame(
+            scroll_settings, corner_radius=10,
+            fg_color=THEME_COLORS["card_subtle"],
+            border_width=1, border_color=THEME_COLORS["border"]
+        )
+        card_platforms.pack(fill="x", pady=(0, 14))
+
+        inner_platforms = ctk.CTkFrame(card_platforms, fg_color="transparent")
+        inner_platforms.pack(fill="x", padx=16, pady=14)
+
+        sec_header4 = ctk.CTkFrame(inner_platforms, fg_color="transparent")
+        sec_header4.pack(fill="x", pady=(0, 6))
+
+        left_hdr4 = ctk.CTkFrame(sec_header4, fg_color="transparent")
+        left_hdr4.pack(side="left")
+        ctk.CTkLabel(
+            left_hdr4, text="",
+            image=self._get_icon("users", (16, 16), THEME_COLORS["primary"])
+        ).pack(side="left", padx=(0, 6))
+        ctk.CTkLabel(
+            left_hdr4, text="SOCIAL & IDENTITY PLATFORM MATRIX",
+            font=ctk.CTkFont(size=12, weight="bold"),
+            text_color=THEME_COLORS["primary"]
+        ).pack(side="left")
+
+        right_hdr4 = ctk.CTkFrame(sec_header4, fg_color="transparent")
+        right_hdr4.pack(side="right")
+
+        ctk.CTkButton(
+            right_hdr4, text="Select All", width=74, height=24,
+            command=self._select_all_platforms,
+            font=ctk.CTkFont(size=10),
+            fg_color=THEME_COLORS["secondary"],
+            hover_color=THEME_COLORS["secondary_hover"],
+            text_color=THEME_COLORS["secondary_text"],
+            border_width=1, border_color=THEME_COLORS["border"]
+        ).pack(side="left", padx=(0, 6))
+
+        ctk.CTkButton(
+            right_hdr4, text="Deselect All", width=74, height=24,
+            command=self._deselect_all_platforms,
+            font=ctk.CTkFont(size=10),
+            fg_color=THEME_COLORS["secondary"],
+            hover_color=THEME_COLORS["secondary_hover"],
+            text_color=THEME_COLORS["secondary_text"],
+            border_width=1, border_color=THEME_COLORS["border"]
+        ).pack(side="left")
+
+        ctk.CTkLabel(
+            inner_platforms,
+            text=f"Target platforms probed for identity existence and OpenGraph metadata ({len(SOCIAL_PLATFORMS)} available).",
+            font=ctk.CTkFont(size=10), text_color=THEME_COLORS["text_secondary"]
+        ).pack(anchor="w", pady=(0, 10))
+
+        # Checkbox matrix (3 columns)
+        self.setting_platform_vars = {}
+        enabled_list = set(self.settings.get("enabled_platforms", [p["name"] for p in SOCIAL_PLATFORMS]))
+
+        grid_plats = ctk.CTkFrame(inner_platforms, fg_color="transparent")
+        grid_plats.pack(fill="x")
+        for c in range(3):
+            grid_plats.grid_columnconfigure(c, weight=1)
+
+        for i, plat in enumerate(SOCIAL_PLATFORMS):
+            pname = plat["name"]
+            pcat = plat.get("category", "")
+            r = i // 3
+            c = i % 3
+
+            var = ctk.BooleanVar(value=(pname in enabled_list))
+            self.setting_platform_vars[pname] = var
+
+            box = ctk.CTkCheckBox(
+                grid_plats,
+                text=f"{pname} ({pcat})",
+                variable=var,
+                font=ctk.CTkFont(size=11),
+                text_color=THEME_COLORS["text_primary"],
+                checkmark_color="#ffffff",
+                fg_color=THEME_COLORS["primary"],
+                hover_color=THEME_COLORS["primary_hover"],
+                border_color=THEME_COLORS["border"]
+            )
+            box.grid(row=r, column=c, sticky="w", padx=6, pady=4)
+
+        # ---------------------------------------------------------------------
+        # 5. Domain TLD Extensions Card
+        # ---------------------------------------------------------------------
+        card_tlds = ctk.CTkFrame(
+            scroll_settings, corner_radius=10,
+            fg_color=THEME_COLORS["card_subtle"],
+            border_width=1, border_color=THEME_COLORS["border"]
+        )
+        card_tlds.pack(fill="x", pady=(0, 14))
+
+        inner_tlds = ctk.CTkFrame(card_tlds, fg_color="transparent")
+        inner_tlds.pack(fill="x", padx=16, pady=14)
+
+        sec_header5 = ctk.CTkFrame(inner_tlds, fg_color="transparent")
+        sec_header5.pack(fill="x", pady=(0, 8))
+        ctk.CTkLabel(
+            sec_header5, text="",
+            image=self._get_icon("world", (16, 16), THEME_COLORS["primary"])
+        ).pack(side="left", padx=(0, 6))
+        ctk.CTkLabel(
+            sec_header5, text="DOMAIN & DNS RECONNAISSANCE EXTENSIONS (TLDs)",
+            font=ctk.CTkFont(size=12, weight="bold"),
+            text_color=THEME_COLORS["primary"]
+        ).pack(side="left")
+
+        ctk.CTkLabel(
+            inner_tlds,
+            text="Comma-separated Top-Level Domains (TLDs) to probe for target name registration and web presence.",
+            font=ctk.CTkFont(size=10), text_color=THEME_COLORS["text_secondary"]
+        ).pack(anchor="w", pady=(0, 6))
+
+        tld_list = self.settings.get("domain_tlds", DOMAIN_TLDS)
+        self.setting_var_tlds = ctk.StringVar(value=", ".join(tld_list))
+        self.entry_setting_tlds = ctk.CTkEntry(
+            inner_tlds, textvariable=self.setting_var_tlds,
+            height=34, fg_color=THEME_COLORS["input_bg"],
+            border_color=THEME_COLORS["border"],
+            text_color=THEME_COLORS["text_primary"]
+        )
+        self.entry_setting_tlds.pack(fill="x", pady=(0, 4))
+
+        # ---------------------------------------------------------------------
+        # 6. Action Buttons & Feedback Bar
+        # ---------------------------------------------------------------------
+        action_bar = ctk.CTkFrame(scroll_settings, fg_color="transparent")
+        action_bar.pack(fill="x", pady=(6, 14))
+
+        self.btn_save_settings = ctk.CTkButton(
+            action_bar, text="  Save & Apply Settings",
+            image=self._get_icon("circle-check", (16, 16), "#ffffff"),
+            compound="left",
+            command=self._save_settings_action,
+            height=38, font=ctk.CTkFont(size=12, weight="bold"),
+            fg_color=THEME_COLORS["primary"],
+            hover_color=THEME_COLORS["primary_hover"],
+            text_color="#ffffff"
+        )
+        self.btn_save_settings.pack(side="left", padx=(0, 10))
+
+        self.btn_reset_settings = ctk.CTkButton(
+            action_bar, text="  Reset to Factory Defaults",
+            image=self._get_icon("refresh", (14, 14), THEME_COLORS["secondary_text"]),
+            compound="left",
+            command=self._reset_settings_action,
+            height=38, font=ctk.CTkFont(size=11),
+            fg_color=THEME_COLORS["secondary"],
+            hover_color=THEME_COLORS["secondary_hover"],
+            text_color=THEME_COLORS["secondary_text"],
+            border_width=1, border_color=THEME_COLORS["border"]
+        )
+        self.btn_reset_settings.pack(side="left")
+
+        # Toast status message
+        self.lbl_settings_toast = ctk.CTkLabel(
+            scroll_settings, text="",
+            font=ctk.CTkFont(size=11, weight="bold"),
+            text_color=THEME_COLORS["success"]
+        )
+        self.lbl_settings_toast.pack(fill="x", pady=(0, 10))
+
+    # -------------------------------------------------------------------------
+    # Settings Event Handlers & Persistent Actions
+    # -------------------------------------------------------------------------
+    def _on_timeout_slider_change(self, val):
+        self.lbl_timeout_val.configure(text=f"{int(val)}s")
+
+    def _on_min_delay_slider_change(self, val):
+        self.lbl_min_delay_val.configure(text=f"{float(val):.1f}s")
+        if self.slider_max_delay.get() < val:
+            self.slider_max_delay.set(val)
+            self.lbl_max_delay_val.configure(text=f"{float(val):.1f}s")
+
+    def _on_max_delay_slider_change(self, val):
+        self.lbl_max_delay_val.configure(text=f"{float(val):.1f}s")
+        if self.slider_min_delay.get() > val:
+            self.slider_min_delay.set(val)
+            self.lbl_min_delay_val.configure(text=f"{float(val):.1f}s")
+
+    def _on_setting_theme_change(self, val):
+        ctk.set_appearance_mode(val)
+        if val == "Dark":
+            self.appearance_switch.select()
+            self.appearance_switch.configure(text="Dark Mode")
+        else:
+            self.appearance_switch.deselect()
+            self.appearance_switch.configure(text="Light Mode")
+
+    def _select_all_platforms(self):
+        for var in self.setting_platform_vars.values():
+            var.set(True)
+
+    def _deselect_all_platforms(self):
+        for var in self.setting_platform_vars.values():
+            var.set(False)
+
+    def _browse_export_dir(self):
+        current_dir = self.setting_var_export_dir.get() or DEFAULT_EXPORT_DIR
+        chosen = filedialog.askdirectory(initialdir=os.path.abspath(current_dir))
+        if chosen:
+            self.setting_var_export_dir.set(chosen)
+
+    def _save_settings_action(self):
+        """Save settings to disk and apply across active application state."""
+        try:
+            # Parse TLDs
+            raw_tlds = self.setting_var_tlds.get().split(",")
+            clean_tlds = []
+            for t in raw_tlds:
+                t = t.strip()
+                if t:
+                    if not t.startswith("."):
+                        t = f".{t}"
+                    clean_tlds.append(t)
+            if not clean_tlds:
+                clean_tlds = list(DOMAIN_TLDS)
+
+            # Enabled platforms
+            enabled_plats = [p for p, v in self.setting_platform_vars.items() if v.get()]
+            if not enabled_plats:
+                enabled_plats = [p["name"] for p in SOCIAL_PLATFORMS]
+                for v in self.setting_platform_vars.values():
+                    v.set(True)
+
+            payload = {
+                "theme": self.setting_var_theme.get(),
+                "default_depth": self.setting_var_depth.get(),
+                "export_dir": self.setting_var_export_dir.get().strip() or DEFAULT_EXPORT_DIR,
+                "auto_export_all": bool(self.setting_var_auto_export.get()),
+                "request_timeout": int(self.slider_timeout.get()),
+                "min_delay": round(float(self.slider_min_delay.get()), 2),
+                "max_delay": round(float(self.slider_max_delay.get()), 2),
+                "user_agent_rotation": bool(self.setting_var_ua_rotation.get()),
+                "enabled_platforms": enabled_plats,
+                "domain_tlds": clean_tlds
+            }
+
+            self.settings = save_settings(payload)
+
+            # Apply theme immediately
+            ctk.set_appearance_mode(payload["theme"])
+            if payload["theme"] == "Dark":
+                self.appearance_switch.select()
+                self.appearance_switch.configure(text="Dark Mode")
+            else:
+                self.appearance_switch.deselect()
+                self.appearance_switch.configure(text="Light Mode")
+
+            # Apply default depth
+            self.seg_depth.set(payload["default_depth"])
+
+            self.lbl_settings_toast.configure(
+                text="✓ Settings saved and applied successfully!",
+                text_color=THEME_COLORS["success"]
+            )
+            self._on_log_message("[SETTINGS] Configuration successfully saved to settings.json and applied.")
+
+        except Exception as e:
+            self.lbl_settings_toast.configure(
+                text=f"Failed to save settings: {e}",
+                text_color=THEME_COLORS["danger"]
+            )
+            self._on_log_message(f"[SETTINGS ERROR] {e}")
+
+    def _reset_settings_action(self):
+        """Reset configuration back to defaults and refresh form fields."""
+        if messagebox.askyesno("Reset Settings", "Are you sure you want to reset all settings to factory defaults?"):
+            self.settings = reset_to_defaults()
+
+            # Refresh form variables
+            self.setting_var_theme.set(self.settings["theme"])
+            self.seg_setting_theme.set(self.settings["theme"])
+            self.setting_var_depth.set(self.settings["default_depth"])
+            self.seg_setting_depth.set(self.settings["default_depth"])
+            self.setting_var_export_dir.set(self.settings["export_dir"])
+            self.entry_setting_export_dir.delete(0, "end")
+            self.entry_setting_export_dir.insert(0, self.settings["export_dir"])
+            self.setting_var_auto_export.set(self.settings["auto_export_all"])
+
+            self.slider_timeout.set(self.settings["request_timeout"])
+            self.lbl_timeout_val.configure(text=f"{self.settings['request_timeout']}s")
+
+            self.slider_min_delay.set(self.settings["min_delay"])
+            self.lbl_min_delay_val.configure(text=f"{self.settings['min_delay']:.1f}s")
+
+            self.slider_max_delay.set(self.settings["max_delay"])
+            self.lbl_max_delay_val.configure(text=f"{self.settings['max_delay']:.1f}s")
+
+            self.setting_var_ua_rotation.set(self.settings["user_agent_rotation"])
+
+            for pname, var in self.setting_platform_vars.items():
+                var.set(pname in self.settings["enabled_platforms"])
+
+            self.setting_var_tlds.set(", ".join(self.settings["domain_tlds"]))
+
+            # Apply theme and depth to app
+            ctk.set_appearance_mode(self.settings["theme"])
+            if self.settings["theme"] == "Dark":
+                self.appearance_switch.select()
+                self.appearance_switch.configure(text="Dark Mode")
+            else:
+                self.appearance_switch.deselect()
+                self.appearance_switch.configure(text="Light Mode")
+
+            self.seg_depth.set(self.settings["default_depth"])
+
+            self.lbl_settings_toast.configure(
+                text="✓ Settings reset to factory defaults.",
+                text_color=THEME_COLORS["accent"]
+            )
+            self._on_log_message("[SETTINGS] Settings reset to factory defaults.")
+
+    # -------------------------------------------------------------------------
     # Engine Execution & Thread Callbacks
     # -------------------------------------------------------------------------
     def _start_expedition(self):
@@ -1103,11 +1749,12 @@ class ExpedUPApp(ctk.CTk):
         self.prog_bar.set(0.0)
         self.lbl_progress_status.configure(text=f"Initializing probe matrix for '{target}'...")
 
-        # Instantiate engine
+        # Instantiate engine with user configuration
         self.engine = ExpedUPEngine(
             log_cb=self._on_log_message,
             progress_cb=self._on_progress_update,
-            result_cb=self._on_result_item
+            result_cb=self._on_result_item,
+            settings=self.settings
         )
 
         # Spawn background worker thread
@@ -1333,7 +1980,7 @@ class ExpedUPApp(ctk.CTk):
             messagebox.showwarning("No Data", "Please execute an expedition before exporting.")
             return
 
-        out_dir = DEFAULT_EXPORT_DIR
+        out_dir = self.settings.get("export_dir", DEFAULT_EXPORT_DIR) if hasattr(self, "settings") else DEFAULT_EXPORT_DIR
         os.makedirs(out_dir, exist_ok=True)
         target = self.current_results.get("target", "Target")
         import time
@@ -1383,8 +2030,9 @@ class ExpedUPApp(ctk.CTk):
             self._on_log_message(f"[EXPORT ERROR] {e}")
 
     def _open_export_dir(self):
-        """Open default output directory in OS file manager."""
-        out_dir = os.path.abspath(DEFAULT_EXPORT_DIR)
+        """Open configured output directory in OS file manager."""
+        target_dir = self.settings.get("export_dir", DEFAULT_EXPORT_DIR) if hasattr(self, "settings") else DEFAULT_EXPORT_DIR
+        out_dir = os.path.abspath(target_dir)
         os.makedirs(out_dir, exist_ok=True)
         if sys.platform == "win32":
             os.startfile(out_dir)
@@ -1432,6 +2080,16 @@ class ExpedUPApp(ctk.CTk):
         val = self.appearance_switch.get()
         ctk.set_appearance_mode(val)
         self.appearance_switch.configure(text="Dark Mode" if val == "Dark" else "Light Mode")
+
+        # Keep Settings Tab controls and persistent config in sync
+        if hasattr(self, "setting_var_theme"):
+            self.setting_var_theme.set(val)
+        if hasattr(self, "seg_setting_theme"):
+            self.seg_setting_theme.set(val)
+        if hasattr(self, "settings"):
+            self.settings["theme"] = val
+            save_settings(self.settings)
+
         self._on_log_message(f"[THEME] Interface appearance switched to: {val} Mode")
 
 
