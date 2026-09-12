@@ -546,8 +546,8 @@ class ExpedUPApp(ctk.CTk):
     # -------------------------------------------------------------------------
     def _build_tab_overview(self):
         """Build KPI metric cards and live Markdown Dossier preview."""
-        kpi_container = ctk.CTkFrame(self.tab_overview, fg_color="transparent")
-        kpi_container.pack(fill="x", padx=10, pady=(6, 12))
+        self.kpi_container = ctk.CTkFrame(self.tab_overview, fg_color="transparent")
+        self.kpi_container.pack(fill="x", padx=10, pady=(6, 12))
 
         # 6 KPI cards in 2 rows of 3
         self.kpi_labels = {}
@@ -565,12 +565,12 @@ class ExpedUPApp(ctk.CTk):
             col = i % 3
 
             card = ctk.CTkFrame(
-                kpi_container, corner_radius=10,
+                self.kpi_container, corner_radius=10,
                 fg_color=THEME_COLORS["card_subtle"],
                 border_width=1, border_color=THEME_COLORS["border"]
             )
             card.grid(row=row, column=col, sticky="nsew", padx=5, pady=5)
-            kpi_container.grid_columnconfigure(col, weight=1)
+            self.kpi_container.grid_columnconfigure(col, weight=1)
 
             top_kpi = ctk.CTkFrame(card, fg_color="transparent")
             top_kpi.pack(pady=(8, 2))
@@ -595,7 +595,37 @@ class ExpedUPApp(ctk.CTk):
 
             self.kpi_labels[key] = val_lbl
 
-        # 6. Intelligence Highlights Panel (Brand Clearance & Developer Blueprint)
+        # 1-Line Minimized KPI Bar (hidden by default until preview is maximized)
+        self.kpi_minimized_bar = ctk.CTkFrame(
+            self.tab_overview, corner_radius=8,
+            fg_color=THEME_COLORS["card_subtle"],
+            border_width=1, border_color=THEME_COLORS["border"]
+        )
+
+        kpi_min_inner = ctk.CTkFrame(self.kpi_minimized_bar, fg_color="transparent")
+        kpi_min_inner.pack(fill="x", padx=10, pady=4)
+
+        self.lbl_kpi_minimized_text = ctk.CTkLabel(
+            kpi_min_inner,
+            text="📊 KPI Metrics: 0 Search  |  0 Social  |  0 Domains  |  0 Phones  |  0 Emails  |  0 Tags",
+            font=ctk.CTkFont(size=11, weight="bold"),
+            text_color=THEME_COLORS["text_secondary"],
+            anchor="w"
+        )
+        self.lbl_kpi_minimized_text.pack(side="left", fill="x", expand=True)
+
+        self.btn_toggle_kpi_expand = ctk.CTkButton(
+            kpi_min_inner, text="▼ Expand KPIs",
+            command=self._toggle_kpi_collapsed_view,
+            width=105, height=22, font=ctk.CTkFont(size=10, weight="bold"),
+            fg_color=THEME_COLORS["secondary"],
+            hover_color=THEME_COLORS["secondary_hover"],
+            text_color=THEME_COLORS["secondary_text"],
+            border_width=1, border_color=THEME_COLORS["border"]
+        )
+        self.btn_toggle_kpi_expand.pack(side="right")
+
+        # Intelligence Highlights Panel (Brand Clearance & Developer Blueprint)
         self.frame_intel_summary = ctk.CTkFrame(
             self.tab_overview, corner_radius=10,
             fg_color=THEME_COLORS["card_subtle"],
@@ -667,19 +697,49 @@ class ExpedUPApp(ctk.CTk):
         )
         self.lbl_biz_details.pack(fill="x", padx=10, pady=(0, 8))
 
+        # 1-Line Minimized Intel Summary Bar (hidden by default until preview is maximized)
+        self.intel_minimized_bar = ctk.CTkFrame(
+            self.tab_overview, corner_radius=8,
+            fg_color=THEME_COLORS["card_subtle"],
+            border_width=1, border_color=THEME_COLORS["border"]
+        )
+
+        intel_min_inner = ctk.CTkFrame(self.intel_minimized_bar, fg_color="transparent")
+        intel_min_inner.pack(fill="x", padx=10, pady=4)
+
+        self.lbl_intel_minimized_text = ctk.CTkLabel(
+            intel_min_inner,
+            text="🎯 Highlights: Uniqueness Score: --/100  |  Operating Base: --",
+            font=ctk.CTkFont(size=11, weight="bold"),
+            text_color=THEME_COLORS["text_secondary"],
+            anchor="w"
+        )
+        self.lbl_intel_minimized_text.pack(side="left", fill="x", expand=True)
+
+        self.btn_toggle_intel_expand = ctk.CTkButton(
+            intel_min_inner, text="▼ Expand Summary",
+            command=self._toggle_intel_collapsed_view,
+            width=115, height=22, font=ctk.CTkFont(size=10, weight="bold"),
+            fg_color=THEME_COLORS["secondary"],
+            hover_color=THEME_COLORS["secondary_hover"],
+            text_color=THEME_COLORS["secondary_text"],
+            border_width=1, border_color=THEME_COLORS["border"]
+        )
+        self.btn_toggle_intel_expand.pack(side="right")
+
         # Live Dossier Preview Header
-        preview_header_row = ctk.CTkFrame(self.tab_overview, fg_color="transparent")
-        preview_header_row.pack(fill="x", padx=10, pady=(6, 4))
+        self.preview_header_row = ctk.CTkFrame(self.tab_overview, fg_color="transparent")
+        self.preview_header_row.pack(fill="x", padx=10, pady=(6, 4))
 
         ctk.CTkLabel(
-            preview_header_row, text="PUBLICATION-READY DOSSIER PREVIEW",
+            self.preview_header_row, text="PUBLICATION-READY DOSSIER PREVIEW",
             font=ctk.CTkFont(size=13, weight="bold"),
             text_color=THEME_COLORS["primary"]
         ).pack(side="left")
 
         # Far right: Copy Dossier Button
         btn_copy = ctk.CTkButton(
-            preview_header_row, text="  Copy Dossier",
+            self.preview_header_row, text="  Copy Dossier",
             image=self._get_icon("copy", (13, 13), THEME_COLORS["secondary_text"]),
             compound="left",
             command=self._copy_dossier_to_clipboard,
@@ -693,7 +753,7 @@ class ExpedUPApp(ctk.CTk):
 
         # Two-box view mode segmented toggle right before the Copy Dossier button
         self.seg_dossier_mode = ctk.CTkSegmentedButton(
-            preview_header_row,
+            self.preview_header_row,
             values=["Formatted View", "Raw Markdown"],
             command=self._on_dossier_mode_change,
             selected_color=THEME_COLORS["primary"],
@@ -706,6 +766,20 @@ class ExpedUPApp(ctk.CTk):
         )
         self.seg_dossier_mode.set("Formatted View")
         self.seg_dossier_mode.pack(side="right", padx=(0, 10))
+
+        # Maximize / Expand Preview Button in front of (to the left of) the view style toggle
+        self.btn_maximize_preview = ctk.CTkButton(
+            self.preview_header_row, text="  Expand Preview",
+            image=self._get_icon("external-link", (13, 13), THEME_COLORS["secondary_text"]),
+            compound="left",
+            command=self._toggle_preview_maximize,
+            height=28, font=ctk.CTkFont(size=11, weight="bold"),
+            fg_color=THEME_COLORS["secondary"],
+            hover_color=THEME_COLORS["secondary_hover"],
+            text_color=THEME_COLORS["secondary_text"],
+            border_width=1, border_color=THEME_COLORS["border"]
+        )
+        self.btn_maximize_preview.pack(side="right", padx=(0, 10))
 
         # 1. Formatted View Container (Scrollable Frame)
         self.frame_formatted_dossier = ctk.CTkScrollableFrame(
@@ -2194,8 +2268,108 @@ class ExpedUPApp(ctk.CTk):
             self.lbl_biz_details.configure(
                 text=f"Mobility: {mobility}\nPrimary Contact: {contact}\nServices: {srv_str or 'General Commercial'}\nRecommended Modules: {len(dr.get('recommended_platform_modules', []))} platform components"
             )
+            self._update_minimized_bar_texts()
         except Exception as e:
             pass
+
+    def _update_minimized_bar_texts(self):
+        """Update text labels on 1-line minimized KPI & Intel bars."""
+        if hasattr(self, "lbl_kpi_minimized_text") and hasattr(self, "kpi_labels"):
+            s_val = self.kpi_labels.get("search", ctk.CTkLabel(self, text="0")).cget("text")
+            soc_val = self.kpi_labels.get("social", ctk.CTkLabel(self, text="0")).cget("text")
+            dom_val = self.kpi_labels.get("domains", ctk.CTkLabel(self, text="0")).cget("text")
+            ph_val = self.kpi_labels.get("phones", ctk.CTkLabel(self, text="0")).cget("text")
+            em_val = self.kpi_labels.get("emails", ctk.CTkLabel(self, text="0")).cget("text")
+            tag_val = self.kpi_labels.get("mentions", ctk.CTkLabel(self, text="0")).cget("text")
+            self.lbl_kpi_minimized_text.configure(
+                text=f"📊 KPI Metrics: {s_val} Search  |  {soc_val} Social  |  {dom_val} Domains  |  {ph_val} Phones  |  {em_val} Emails  |  {tag_val} Tags"
+            )
+
+        if hasattr(self, "lbl_intel_minimized_text") and hasattr(self, "lbl_clearance_score"):
+            score_txt = self.lbl_clearance_score.cget("text")
+            base_txt = self.lbl_biz_base.cget("text")
+            self.lbl_intel_minimized_text.configure(
+                text=f"🎯 Highlights: {score_txt}  |  {base_txt}"
+            )
+
+    def _toggle_preview_maximize(self):
+        """Expand preview container to full Executive Overview tab space by minimizing stats & highlight panels."""
+        self.is_preview_maximized = not getattr(self, "is_preview_maximized", False)
+
+        if self.is_preview_maximized:
+            # Unpack overview components
+            self.kpi_container.pack_forget()
+            self.frame_intel_summary.pack_forget()
+            self.preview_header_row.pack_forget()
+            self.frame_formatted_dossier.pack_forget()
+            self.txt_dossier_preview.pack_forget()
+
+            # Pack 1-line minimized bars & header row
+            self.kpi_minimized_bar.pack(fill="x", padx=10, pady=(4, 2))
+            self.intel_minimized_bar.pack(fill="x", padx=10, pady=(2, 4))
+            self.preview_header_row.pack(fill="x", padx=10, pady=(6, 4))
+            self._update_minimized_bar_texts()
+
+            # Reset internal expand states
+            self.is_kpi_expanded_in_max = False
+            self.is_intel_expanded_in_max = False
+            self.btn_toggle_kpi_expand.configure(text="▼ Expand KPIs")
+            self.btn_toggle_intel_expand.configure(text="▼ Expand Summary")
+
+            # Configure button
+            self.btn_maximize_preview.configure(
+                text="  Restore View",
+                fg_color=THEME_COLORS["primary"],
+                hover_color=THEME_COLORS["primary_hover"],
+                text_color="#ffffff"
+            )
+            # Repack active preview view in expanded mode
+            self._on_dossier_mode_change(self.seg_dossier_mode.get())
+        else:
+            # Unpack overview components
+            self.kpi_minimized_bar.pack_forget()
+            self.intel_minimized_bar.pack_forget()
+            self.kpi_container.pack_forget()
+            self.frame_intel_summary.pack_forget()
+            self.preview_header_row.pack_forget()
+            self.frame_formatted_dossier.pack_forget()
+            self.txt_dossier_preview.pack_forget()
+
+            # Pack in clean top-to-bottom order
+            self.kpi_container.pack(fill="x", padx=10, pady=(6, 12))
+            self.frame_intel_summary.pack(fill="x", padx=10, pady=(0, 10))
+            self.preview_header_row.pack(fill="x", padx=10, pady=(6, 4))
+
+            # Configure button
+            self.btn_maximize_preview.configure(
+                text="  Expand Preview",
+                fg_color=THEME_COLORS["secondary"],
+                hover_color=THEME_COLORS["secondary_hover"],
+                text_color=THEME_COLORS["secondary_text"]
+            )
+            # Repack active preview view
+            self._on_dossier_mode_change(self.seg_dossier_mode.get())
+
+    def _toggle_kpi_collapsed_view(self):
+        """Toggle full 2x3 KPI grid while in Maximized Preview mode."""
+        self.is_kpi_expanded_in_max = not getattr(self, "is_kpi_expanded_in_max", False)
+        if self.is_kpi_expanded_in_max:
+            self.kpi_container.pack(fill="x", padx=10, pady=(2, 6), after=self.kpi_minimized_bar)
+            self.btn_toggle_kpi_expand.configure(text="▲ Collapse KPIs")
+        else:
+            self.kpi_container.pack_forget()
+            self.btn_toggle_kpi_expand.configure(text="▼ Expand KPIs")
+
+    def _toggle_intel_collapsed_view(self):
+        """Toggle 2-card Intel summary while in Maximized Preview mode."""
+        self.is_intel_expanded_in_max = not getattr(self, "is_intel_expanded_in_max", False)
+        if self.is_intel_expanded_in_max:
+            self.intel_minimized_bar.pack(fill="x", padx=10, pady=(2, 4), before=self.preview_header_row)
+            self.frame_intel_summary.pack(fill="x", padx=10, pady=(2, 6), after=self.intel_minimized_bar)
+            self.btn_toggle_intel_expand.configure(text="▲ Collapse Summary")
+        else:
+            self.frame_intel_summary.pack_forget()
+            self.btn_toggle_intel_expand.configure(text="▼ Expand Summary")
 
     def _on_dossier_mode_change(self, mode_val: str):
         """Switch between Formatted Card View and Raw Markdown Text View."""
