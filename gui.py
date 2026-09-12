@@ -23,7 +23,8 @@ from config import (
 from expedup_engine import ExpedUPEngine
 from exporters import (
     generate_markdown_dossier, export_markdown_file,
-    export_json_file, export_csv_file, export_all_formats
+    export_json_file, export_csv_file, export_all_formats,
+    load_expedition_file
 )
 from icons import get_icon
 from settings_manager import load_settings, save_settings, reset_to_defaults, TEXT_SCALE_MAP
@@ -460,6 +461,19 @@ class ExpedUPApp(ctk.CTk):
         )
         self.btn_export_json.pack(side="right", fill="x", expand=True, padx=(3, 0))
 
+        self.btn_load_expedition = ctk.CTkButton(
+            scroll_sidebar, text="  Load Saved Expedition / Dossier",
+            image=self._get_icon("folder", (13, 13), THEME_COLORS["primary"]),
+            compound="left",
+            command=self._load_saved_expedition,
+            height=32, fg_color=THEME_COLORS["secondary"],
+            hover_color=THEME_COLORS["secondary_hover"],
+            text_color=THEME_COLORS["text_primary"],
+            border_width=1, border_color=THEME_COLORS["primary"],
+            font=ctk.CTkFont(size=12, weight="bold")
+        )
+        self.btn_load_expedition.pack(fill="x", pady=(6, 4))
+
         self.btn_open_folder = ctk.CTkButton(
             scroll_sidebar, text="  Open Dossier Folder",
             image=self._get_icon("folder", (13, 13), THEME_COLORS["secondary_text"]),
@@ -471,7 +485,7 @@ class ExpedUPApp(ctk.CTk):
             border_width=1, border_color=THEME_COLORS["border"],
             font=ctk.CTkFont(size=12)
         )
-        self.btn_open_folder.pack(fill="x", pady=(4, 8))
+        self.btn_open_folder.pack(fill="x", pady=(2, 8))
 
         # Status Toast Label
         self.lbl_export_toast = ctk.CTkLabel(
@@ -2506,6 +2520,129 @@ class ExpedUPApp(ctk.CTk):
             os.startfile(out_dir)
         else:
             webbrowser.open(f"file://{out_dir}")
+
+    def _load_saved_expedition(self):
+        """Open file dialog to load a saved expedition file (.expedup, .json, .md, .txt) and restore UI state."""
+        initial_dir = self.settings.get("export_dir", DEFAULT_EXPORT_DIR) if hasattr(self, "settings") else DEFAULT_EXPORT_DIR
+        filepath = filedialog.askopenfilename(
+            title="Open Saved Dossier / Expedition",
+            initialdir=initial_dir if os.path.exists(initial_dir) else None,
+            filetypes=[
+                ("ExpedUP Files (*.expedup, *.json, *.md, *.txt)", "*.expedup *.json *.md *.txt"),
+                ("ExpedUP Native Bundle (*.expedup)", "*.expedup"),
+                ("JSON Data (*.json)", "*.json"),
+                ("Markdown Dossier (*.md)", "*.md"),
+                ("Text Dossier (*.txt)", "*.txt"),
+                ("All Files (*.*)", "*.*")
+            ]
+        )
+        if not filepath:
+            return
+
+        try:
+            results = load_expedition_file(filepath)
+            if not results or not results.get("target"):
+                messagebox.showerror(
+                    "Load Failed",
+                    f"Could not parse valid expedition target or data from:\n{os.path.basename(filepath)}"
+                )
+                return
+
+            # Reset current UI state
+            self._reset_dashboard_results()
+
+            # Restore input fields
+            self.entry_target.delete(0, "end")
+            self.entry_target.insert(0, results.get("target", ""))
+
+            if results.get("location"):
+                self.entry_location.delete(0, "end")
+                self.entry_location.insert(0, results.get("location", ""))
+
+            if results.get("category"):
+                self.entry_category.delete(0, "end")
+                self.entry_category.insert(0, results.get("category", ""))
+
+            if results.get("phone"):
+                self.entry_phone.delete(0, "end")
+                self.entry_phone.insert(0, results.get("phone", ""))
+
+            # Convert entities to sets for current_results
+            entities_raw = results.get("entities", {})
+            results["entities"] = {
+                "phones": set(entities_raw.get("phones", [])),
+                "emails": set(entities_raw.get("emails", [])),
+                "mentions": set(entities_raw.get("mentions", [])),
+                "hashtags": set(entities_raw.get("hashtags", []))
+            }
+            self.current_results = results
+
+            # Render Search Results
+            search_items = results.get("search_results", [])
+            for item in search_items:
+                self._render_search_item(item)
+            self.lbl_search_count.configure(text=f"{len(search_items)} search results indexed.")
+            self.kpi_labels["search"].configure(text=str(len(search_items)))
+
+            # Render Social Profiles
+            social_items = results.get("social_profiles", [])
+            for item in social_items:
+                self._render_social_item(item)
+            active_social = len([p for p in social_items if p.get("exists")])
+            self.lbl_social_count.configure(text=f"{active_social} active social profiles discovered.")
+            self.kpi_labels["social"].configure(text=str(active_social))
+
+            # Render Domains
+            domain_items = results.get("domains", [])
+            for dom in domain_items:
+                self._render_domain_item(dom)
+            active_doms = len([d for d in domain_items if d.get("is_registered")])
+            self.kpi_labels["domains"].configure(text=str(active_doms))
+
+            # Render Entities
+            phones = list(results["entities"]["phones"])
+            for phone in phones:
+                self._render_phone_item(phone)
+            self.kpi_labels["phones"].configure(text=str(len(phones)))
+
+            emails = list(results["entities"]["emails"])
+            for email in emails:
+                self._render_email_item(email)
+            self.kpi_labels["emails"].configure(text=str(len(emails)))
+
+            mentions = list(results["entities"]["mentions"])
+            self.txt_mentions.delete("1.0", "end")
+            if mentions:
+                self.txt_mentions.insert("1.0", "\n".join(sorted(mentions)))
+            self.kpi_labels["mentions"].configure(text=str(len(mentions)))
+
+            hashtags = list(results["entities"]["hashtags"])
+            self.txt_hashtags.delete("1.0", "end")
+            if hashtags:
+                self.txt_hashtags.insert("1.0", "\n".join(sorted(hashtags)))
+            self.kpi_labels["hashtags"].configure(text=str(len(hashtags)))
+
+            # Synthesize Intelligence & Refresh Dossier Preview
+            self._update_intelligence_overview()
+            self._refresh_dossier_preview()
+
+            # Update status toast and log
+            filename = os.path.basename(filepath)
+            self.lbl_export_toast.configure(
+                text=f"✓ Loaded: {filename}",
+                text_color=THEME_COLORS["success"]
+            )
+            self.lbl_progress_status.configure(
+                text=f"Loaded saved dossier for target: {results.get('target', 'Unknown')}"
+            )
+            self._on_log_message(f"[LOAD] Successfully imported expedition file: {filepath}")
+
+        except Exception as e:
+            messagebox.showerror(
+                "Load Error",
+                f"An error occurred while opening expedition file:\n{str(e)}"
+            )
+            self._on_log_message(f"[LOAD ERROR] {e}")
 
     # -------------------------------------------------------------------------
     # Clipboard & Appearance Helpers

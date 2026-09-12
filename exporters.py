@@ -304,22 +304,197 @@ def export_csv_file(data: Dict, output_path: str) -> str:
     return output_path
 
 
+def export_expedup_file(data: Dict, output_path: str) -> str:
+    """Save full expedition bundle as a native .expedup JSON file."""
+    bundle = {
+        "app": "ExpedUP",
+        "version": "1.0.0",
+        "format": "expedition_bundle",
+        "saved_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+        "payload": data
+    }
+    serializable = json.dumps(bundle, indent=2, ensure_ascii=False, default=lambda o: list(o) if isinstance(o, set) else str(o))
+    os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
+    with open(output_path, "w", encoding="utf-8") as f:
+        f.write(serializable)
+    return output_path
+
+
+def load_expedition_file(filepath: str) -> Dict[str, Any]:
+    """
+    Load a saved expedition file (.expedup, .json, .md, .txt) into a standard ExpedUP results dict.
+    """
+    if not os.path.exists(filepath):
+        raise FileNotFoundError(f"Expedition file not found: {filepath}")
+
+    ext = os.path.splitext(filepath)[1].lower()
+
+    if ext in [".expedup", ".json"]:
+        with open(filepath, "r", encoding="utf-8", errors="ignore") as f:
+            raw_data = json.load(f)
+
+        if isinstance(raw_data, dict) and "payload" in raw_data and isinstance(raw_data["payload"], dict):
+            data = raw_data["payload"]
+        elif isinstance(raw_data, dict):
+            data = raw_data
+        else:
+            raise ValueError("Invalid expedition JSON structure")
+
+        # Convert entities lists back to sets for engine consistency
+        entities = data.get("entities", {})
+        data["entities"] = {
+            "phones": set(entities.get("phones", [])),
+            "emails": set(entities.get("emails", [])),
+            "mentions": set(entities.get("mentions", [])),
+            "hashtags": set(entities.get("hashtags", []))
+        }
+
+        # Ensure essential keys exist
+        data.setdefault("search_results", [])
+        data.setdefault("social_profiles", [])
+        data.setdefault("domains", [])
+        return data
+
+    elif ext in [".md", ".txt"]:
+        with open(filepath, "r", encoding="utf-8", errors="ignore") as f:
+            content = f.read()
+
+        # Parse target name from markdown header
+        m_target = re.search(r"#\s*ExpedUP\s+Intelligence\s+Dossier\s*—\s*([^\n]+)", content, re.IGNORECASE)
+        if not m_target:
+            m_target = re.search(r"#\s*([^\n]+)", content)
+        target_name = m_target.group(1).strip() if m_target else os.path.splitext(os.path.basename(filepath))[0]
+
+        search_results = []
+        social_profiles = []
+        domains = []
+
+        # 1. Parse Section 7: Web Search Results blocks
+        search_blocks = re.findall(
+            r'###\s*7\.\d+\.\s*(.*?)\n\s*-\s*\*\*URL:\*\*\s*(?:\[.*?\]\((.*?)\)|(https?://[^\s\)]+))\n\s*-\s*\*\*Source:\*\*\s*(.*?)\n\s*-\s*\*\*Snippet:\*\*\s*>(?:[ \t]*)(.*?)(?=\n\n|\n#|\Z)',
+            content, re.DOTALL
+        )
+        for s_title, s_url1, s_url2, s_src, s_snip in search_blocks:
+            url = (s_url1 or s_url2 or "").strip()
+            search_results.append({
+                "engine": s_src.strip() or "Search Engine",
+                "query": target_name,
+                "title": s_title.strip(),
+                "url": url,
+                "snippet": s_snip.strip().replace("\n> ", " ")
+            })
+
+        # 2. Parse Section 6: Verified Social Media Profiles table
+        social_rows = re.findall(
+            r'\|\s*\*\*(.*?)\*\*\s*\|\s*(.*?)\s*\|\s*\[.*?\]\((https?://[^\s\)]+)\)\s*\|\s*(.*?)\s*\|',
+            content
+        )
+        for p_name, p_cat, p_url, p_desc in social_rows:
+            social_profiles.append({
+                "platform": p_name.strip(),
+                "category": p_cat.strip() or "Social",
+                "url": p_url.strip(),
+                "exists": True,
+                "title": p_desc.strip(),
+                "description": p_desc.strip()
+            })
+
+        # 3. Parse Section 9: Domain & DNS Availability Status table
+        domain_rows = re.findall(
+            r'\|\s*`?([a-zA-Z0-9_.-]+\.[a-zA-Z]{2,})`?\s*\|\s*(.*?)\s*\|\s*(.*?)\s*\|\s*(\d{3})\s*\|\s*(.*?)\s*\|',
+            content
+        )
+        for dom_name, status_str, ip_str, code_str, dom_title in domain_rows:
+            is_reg = "Registered" in status_str or "Active" in status_str
+            domains.append({
+                "domain": dom_name.strip(),
+                "is_registered": is_reg,
+                "resolved_ip": ip_str.strip(),
+                "status_code": int(code_str.strip()) if code_str.strip().isdigit() else 200,
+                "title": dom_title.strip()
+            })
+
+        # Fallback if section parsing yielded empty search & social profiles
+        if not search_results and not social_profiles:
+            links = re.findall(r'\[(.*?)\]\((https?://[^\s\)]+)\)', content)
+            social_domains = ["instagram.com", "tiktok.com", "threads.net", "facebook.com", "twitter.com", "x.com", "linkedin.com", "github.com", "youtube.com", "pinterest.com", "snapchat.com", "reddit.com", "medium.com", "telegram.org", "t.me", "behance.net", "soundcloud.com"]
+
+            for title, url in links:
+                is_soc = any(sd in url.lower() for sd in social_domains)
+                if is_soc:
+                    social_profiles.append({
+                        "platform": title or "Social Profile",
+                        "category": "Social",
+                        "url": url,
+                        "exists": True,
+                        "title": title or "Verified Profile",
+                        "description": "Extracted from saved markdown dossier."
+                    })
+                else:
+                    search_results.append({
+                        "engine": "Markdown Dossier",
+                        "query": target_name,
+                        "title": title or "Indexed Web Finding",
+                        "url": url,
+                        "snippet": "Extracted from saved dossier link."
+                    })
+
+        # Extract phone numbers, emails, mentions, hashtags
+        phones = set(re.findall(r'\b0[1-9]\d{8}\b', content) + re.findall(r'\+?\d{1,4}[\s.-]?\(?\d{2,4}\)?[\s.-]?\d{3,4}[\s.-]?\d{3,4}\b', content))
+        emails = set(re.findall(r'[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+', content))
+        mentions = set(re.findall(r'@[a-zA-Z0-9_.-]{3,30}', content))
+        hashtags = set(re.findall(r'#[a-zA-Z0-9_]{3,35}', content))
+
+        results = {
+            "target": target_name,
+            "location": "",
+            "category": "",
+            "phone": "",
+            "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
+            "queries_executed": [],
+            "search_results": search_results,
+            "social_profiles": social_profiles,
+            "domains": [],
+            "entities": {
+                "phones": phones,
+                "emails": emails,
+                "mentions": mentions,
+                "hashtags": hashtags
+            }
+        }
+
+        # Synthesize intelligence for parsed markdown
+        try:
+            from intelligence_synthesizer import synthesize_intelligence
+            results["intelligence"] = synthesize_intelligence(target_name, results)
+        except Exception:
+            pass
+
+        return results
+
+    else:
+        raise ValueError(f"Unsupported file format '{ext}'. Expected .expedup, .json, .md, or .txt")
+
+
 def export_all_formats(data: Dict, output_dir: str = "artifacts/expeditions") -> Dict[str, str]:
-    """Export expedition findings into Markdown, JSON, and CSV simultaneously."""
+    """Export expedition findings into ExpedUP Bundle (.expedup), Markdown, JSON, and CSV simultaneously."""
     clean_target = re.sub(r'[^a-zA-Z0-9_]', '', data.get("target", "expedition")).lower()
     ts = time.strftime("%Y%m%d_%H%M%S")
     base_name = f"ExpedUP_{clean_target}_{ts}"
 
     os.makedirs(output_dir, exist_ok=True)
+    expedup_path = os.path.join(output_dir, f"{base_name}.expedup")
     md_path = os.path.join(output_dir, f"{base_name}.md")
     json_path = os.path.join(output_dir, f"{base_name}.json")
     csv_path = os.path.join(output_dir, f"{base_name}.csv")
 
+    export_expedup_file(data, expedup_path)
     export_markdown_file(data, md_path)
     export_json_file(data, json_path)
     export_csv_file(data, csv_path)
 
     return {
+        "expedup": os.path.abspath(expedup_path),
         "markdown": os.path.abspath(md_path),
         "json": os.path.abspath(json_path),
         "csv": os.path.abspath(csv_path)
