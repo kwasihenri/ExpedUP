@@ -1,6 +1,6 @@
 {
   "theme": "Light",
-  "text_size": "Normal (100%)",
+  "text_size": "Large (110%)",
   "default_depth": "Deep (Multi-Engine)",
   "export_dir": "C:/MyProjects/OpenSource/ExpedUP/artifacts/newExpeditions",
   "auto_export_all": false,

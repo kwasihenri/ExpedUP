@@ -6,6 +6,7 @@ Features modern light-theme default (Vectihost/Selligine style) with full dark-t
 
 import os
 import sys
+import time
 import threading
 import webbrowser
 import tkinter as tk
@@ -662,19 +663,44 @@ class ExpedUPApp(ctk.CTk):
             text_color=THEME_COLORS["primary"]
         ).pack(side="left")
 
-        ctk.CTkButton(
+        # Far right: Copy Dossier Button
+        btn_copy = ctk.CTkButton(
             preview_header_row, text="  Copy Dossier",
             image=self._get_icon("copy", (13, 13), THEME_COLORS["secondary_text"]),
             compound="left",
             command=self._copy_dossier_to_clipboard,
-            width=120, height=26, font=ctk.CTkFont(size=12),
+            width=115, height=28, font=ctk.CTkFont(size=12),
             fg_color=THEME_COLORS["secondary"],
             hover_color=THEME_COLORS["secondary_hover"],
             text_color=THEME_COLORS["secondary_text"],
             border_width=1, border_color=THEME_COLORS["border"]
-        ).pack(side="right")
+        )
+        btn_copy.pack(side="right")
 
-        # Dossier Textbox
+        # Two-box view mode segmented toggle right before the Copy Dossier button
+        self.seg_dossier_mode = ctk.CTkSegmentedButton(
+            preview_header_row,
+            values=["Formatted View", "Raw Markdown"],
+            command=self._on_dossier_mode_change,
+            selected_color=THEME_COLORS["primary"],
+            selected_hover_color=THEME_COLORS["primary_hover"],
+            unselected_color=THEME_COLORS["card_subtle"],
+            unselected_hover_color=THEME_COLORS["secondary_hover"],
+            text_color=THEME_COLORS["text_primary"],
+            font=ctk.CTkFont(size=11, weight="bold"),
+            height=28
+        )
+        self.seg_dossier_mode.set("Formatted View")
+        self.seg_dossier_mode.pack(side="right", padx=(0, 10))
+
+        # 1. Formatted View Container (Scrollable Frame)
+        self.frame_formatted_dossier = ctk.CTkScrollableFrame(
+            self.tab_overview,
+            fg_color="transparent",
+            scrollbar_button_color=THEME_COLORS["border"]
+        )
+
+        # 2. Raw Markdown Textbox Container
         self.txt_dossier_preview = ctk.CTkTextbox(
             self.tab_overview, wrap="word",
             font=ctk.CTkFont(family="Consolas", size=12),
@@ -682,8 +708,10 @@ class ExpedUPApp(ctk.CTk):
             text_color=THEME_COLORS["text_primary"],
             border_width=1, border_color=THEME_COLORS["border"]
         )
-        self.txt_dossier_preview.pack(fill="both", expand=True, padx=10, pady=(0, 10))
         self.txt_dossier_preview.insert("1.0", "# ExpedUP Intelligence Dossier\n\nLaunch an expedition to generate a real-time reconnaissance dossier.")
+
+        # Default layout based on mode toggle
+        self._on_dossier_mode_change("Formatted View")
 
     # -------------------------------------------------------------------------
     # Tab 2: Web Search Results Feed
@@ -1965,6 +1993,9 @@ class ExpedUPApp(ctk.CTk):
             self.prog_bar.set(1.0)
             self.lbl_progress_status.configure(text="Expedition completed successfully.")
 
+        # Update Live Intelligence Overview & Dossier Preview
+        self._refresh_dossier_preview()
+
     # -------------------------------------------------------------------------
     # Network Struggle & Pause/Resume Event Handlers
     # -------------------------------------------------------------------------
@@ -2152,12 +2183,177 @@ class ExpedUPApp(ctk.CTk):
         except Exception as e:
             pass
 
+    def _on_dossier_mode_change(self, mode_val: str):
+        """Switch between Formatted Card View and Raw Markdown Text View."""
+        if mode_val == "Raw Markdown":
+            self.frame_formatted_dossier.pack_forget()
+            self.txt_dossier_preview.pack(fill="both", expand=True, padx=10, pady=(0, 10))
+        else:
+            self.txt_dossier_preview.pack_forget()
+            self.frame_formatted_dossier.pack(fill="both", expand=True, padx=10, pady=(0, 10))
+
+    def _render_formatted_dossier_preview(self):
+        """Render publication-grade section cards in frame_formatted_dossier."""
+        for child in self.frame_formatted_dossier.winfo_children():
+            child.destroy()
+
+        intel = self.current_results.get("intelligence", {})
+        bc = intel.get("brand_clearance", {})
+        bp = intel.get("business_profile", {})
+        dr = intel.get("digital_roadmap", {})
+        target = self.current_results.get("target") or self.entry_target.get().strip() or "Target"
+        ts = self.current_results.get("timestamp") or time.strftime("%Y-%m-%d %H:%M:%S")
+
+        # 1. Title Banner Card
+        banner = ctk.CTkFrame(
+            self.frame_formatted_dossier, corner_radius=10,
+            fg_color=THEME_COLORS["card_subtle"],
+            border_width=1, border_color=THEME_COLORS["border"]
+        )
+        banner.pack(fill="x", pady=(0, 10))
+
+        inner_b = ctk.CTkFrame(banner, fg_color="transparent")
+        inner_b.pack(fill="x", padx=14, pady=12)
+
+        ctk.CTkLabel(
+            inner_b, text=f"EXPEDUP INTELLIGENCE DOSSIER — '{target.upper()}'",
+            font=ctk.CTkFont(size=14, weight="bold"),
+            text_color=THEME_COLORS["primary"]
+        ).pack(anchor="w")
+
+        ctk.CTkLabel(
+            inner_b, text=f"Generated: {ts}  |  ExpedUP v{VERSION} Reconnaissance Engine",
+            font=ctk.CTkFont(size=11),
+            text_color=THEME_COLORS["text_secondary"]
+        ).pack(anchor="w", pady=(2, 0))
+
+        # 2. Executive Snapshot Card
+        card_snap = ctk.CTkFrame(
+            self.frame_formatted_dossier, corner_radius=10,
+            fg_color=THEME_COLORS["card"],
+            border_width=1, border_color=THEME_COLORS["border"]
+        )
+        card_snap.pack(fill="x", pady=(0, 10))
+
+        inner_snap = ctk.CTkFrame(card_snap, fg_color="transparent")
+        inner_snap.pack(fill="x", padx=14, pady=12)
+
+        score = bc.get("uniqueness_score", 0)
+        rating = bc.get("clearance_rating", "N/A")
+        score_color = THEME_COLORS["success"] if score >= 80 else (THEME_COLORS["warning"] if score >= 50 else THEME_COLORS["danger"])
+
+        ctk.CTkLabel(
+            inner_snap, text="1. EXECUTIVE RECONNAISSANCE & BRAND CLEARANCE SNAPSHOT",
+            font=ctk.CTkFont(size=12, weight="bold"),
+            text_color=THEME_COLORS["primary"]
+        ).pack(anchor="w", pady=(0, 4))
+
+        ctk.CTkLabel(
+            inner_snap, text=f"Brand Uniqueness Score: {score}/100 — {rating}",
+            font=ctk.CTkFont(size=16, weight="bold"),
+            text_color=score_color
+        ).pack(anchor="w", pady=(0, 4))
+
+        ctk.CTkLabel(
+            inner_snap, text=bc.get("verdict", "No findings gathered yet."),
+            font=ctk.CTkFont(size=12),
+            text_color=THEME_COLORS["text_primary"],
+            wraplength=700, justify="left"
+        ).pack(anchor="w")
+
+        # 3. Business Profile Card
+        card_biz = ctk.CTkFrame(
+            self.frame_formatted_dossier, corner_radius=10,
+            fg_color=THEME_COLORS["card"],
+            border_width=1, border_color=THEME_COLORS["border"]
+        )
+        card_biz.pack(fill="x", pady=(0, 10))
+
+        inner_biz = ctk.CTkFrame(card_biz, fg_color="transparent")
+        inner_biz.pack(fill="x", padx=14, pady=12)
+
+        ctk.CTkLabel(
+            inner_biz, text="2. BUSINESS PROFILE & OPERATIONAL MODEL",
+            font=ctk.CTkFont(size=12, weight="bold"),
+            text_color=THEME_COLORS["accent"]
+        ).pack(anchor="w", pady=(0, 4))
+
+        op_base = bp.get("operating_base", "Undetected / Global Operations")
+        mobility = bp.get("mobility_model", "On-site / In-studio")
+        contact = bp.get("primary_contact", "N/A")
+        services = bp.get("services", [])
+        srv_lines = "\n".join([f"• {s.get('service', '')}: {s.get('details', '')}" for s in services]) if services else "• Unoccupied or General Identity"
+
+        ctk.CTkLabel(
+            inner_biz,
+            text=f"Operating Base: {op_base}\nMobility Model: {mobility}\nPrimary Contact: {contact}\n\nServices & Offerings Identified:\n{srv_lines}",
+            font=ctk.CTkFont(size=12),
+            text_color=THEME_COLORS["text_primary"],
+            justify="left", anchor="w"
+        ).pack(anchor="w")
+
+        # 4. Developer Digital Roadmap & Blueprint
+        card_dev = ctk.CTkFrame(
+            self.frame_formatted_dossier, corner_radius=10,
+            fg_color=THEME_COLORS["card"],
+            border_width=1, border_color=THEME_COLORS["border"]
+        )
+        card_dev.pack(fill="x", pady=(0, 10))
+
+        inner_dev = ctk.CTkFrame(card_dev, fg_color="transparent")
+        inner_dev.pack(fill="x", padx=14, pady=12)
+
+        ctk.CTkLabel(
+            inner_dev, text="3. DEVELOPER DIGITAL ROADMAP & ARCHITECTURAL BLUEPRINT",
+            font=ctk.CTkFont(size=12, weight="bold"),
+            text_color=THEME_COLORS["primary"]
+        ).pack(anchor="w", pady=(0, 4))
+
+        mods = dr.get("recommended_platform_modules", [])
+        mod_str = "\n".join([f"• [{m.get('module_name', '')}] {m.get('purpose', '')}" for m in mods]) if mods else "• Greenfield Brand Launch Blueprint"
+        entities = ", ".join(dr.get("target_database_entities", []))
+
+        ctk.CTkLabel(
+            inner_dev,
+            text=f"Operational Bottlenecks: {dr.get('current_state_bottleneck', 'N/A')}\n\nRecommended System Modules:\n{mod_str}\n\nTarget Database Entities: {entities or 'N/A'}",
+            font=ctk.CTkFont(size=12),
+            text_color=THEME_COLORS["text_primary"],
+            justify="left", anchor="w"
+        ).pack(anchor="w")
+
+        # 5. Brand Clearance & Name Collision Matrix Card
+        card_clear = ctk.CTkFrame(
+            self.frame_formatted_dossier, corner_radius=10,
+            fg_color=THEME_COLORS["card"],
+            border_width=1, border_color=THEME_COLORS["border"]
+        )
+        card_clear.pack(fill="x", pady=(0, 10))
+
+        inner_clear = ctk.CTkFrame(card_clear, fg_color="transparent")
+        inner_clear.pack(fill="x", padx=14, pady=12)
+
+        ctk.CTkLabel(
+            inner_clear, text="4. BRAND CLEARANCE & NAME COLLISION MATRIX",
+            font=ctk.CTkFont(size=12, weight="bold"),
+            text_color=THEME_COLORS["warning"]
+        ).pack(anchor="w", pady=(0, 4))
+
+        alts = ", ".join(bc.get("clean_alternative_handles", []))
+        ctk.CTkLabel(
+            inner_clear,
+            text=f"Handle Collision Rate: {bc.get('handle_collision_rate', 'N/A')}\nDomain Collision Rate: {bc.get('domain_collision_rate', 'N/A')}\nRecommended Clean Alternatives: {alts or 'N/A'}",
+            font=ctk.CTkFont(size=12),
+            text_color=THEME_COLORS["text_primary"],
+            justify="left", anchor="w"
+        ).pack(anchor="w")
+
     def _refresh_dossier_preview(self):
-        """Generate and display markdown dossier text and intelligence highlights."""
+        """Generate and display markdown dossier text and formatted intelligence preview."""
         self._update_intelligence_overview()
         dossier_md = generate_markdown_dossier(self.current_results)
         self.txt_dossier_preview.delete("1.0", "end")
         self.txt_dossier_preview.insert("1.0", dossier_md)
+        self._render_formatted_dossier_preview()
 
     # -------------------------------------------------------------------------
     # Resets & Utility Actions
