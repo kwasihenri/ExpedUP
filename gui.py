@@ -49,7 +49,7 @@ class ExpedUPApp(ctk.CTk):
         ctk.set_widget_scaling(scale_val)
 
         # Window Configuration
-        self.title(f"{APP_NAME} v{VERSION} — Universal OSINT & Brand Reconnaissance Engine")
+        self.title(f"{APP_NAME} v{VERSION} — Smart Web Search & Brand Research Engine")
         self.geometry(f"{DEFAULT_WINDOW_WIDTH}x{DEFAULT_WINDOW_HEIGHT}")
         self.minsize(MIN_WINDOW_WIDTH, MIN_WINDOW_HEIGHT)
         self.configure(fg_color=THEME_COLORS["bg"])

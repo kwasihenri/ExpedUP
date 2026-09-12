@@ -1,0 +1,231 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap');
+
+:root {
+  --sl-primary:          hsl(210, 65%, 36%);
+  --sl-primary-hover:    hsl(210, 65%, 29%);
+  --sl-primary-active:   hsl(210, 65%, 24%);
+  --sl-primary-light:    hsl(210, 65%, 95%);
+  --sl-primary-muted:    hsl(210, 30%, 84%);
+
+  --sl-bg:               hsl(220, 18%, 96%);
+  --sl-bg-card:          hsl(0, 0%, 100%);
+  --sl-bg-secondary:     hsl(220, 14%, 93%);
+  --sl-bg-hover:         hsl(220, 14%, 91%);
+
+  --sl-text:             hsl(220, 22%, 13%);
+  --sl-text-muted:       hsl(220, 10%, 46%);
+  --sl-text-faint:       hsl(220, 8%, 65%);
+  --sl-text-inverse:     hsl(0, 0%, 100%);
+
+  --sl-border:           hsl(220, 14%, 90%);
+  --sl-border-strong:    hsl(220, 14%, 82%);
+  --sl-border-focus:     hsl(210, 65%, 36%);
+
+  --sl-success:          hsl(142, 48%, 38%);
+  --sl-success-bg:       hsl(142, 48%, 95%);
+  --sl-success-border:   hsl(142, 48%, 82%);
+  --sl-danger:           hsl(0, 62%, 48%);
+  --sl-danger-bg:        hsl(0, 62%, 96%);
+  --sl-danger-border:    hsl(0, 62%, 84%);
+  --sl-warning:          hsl(38, 88%, 46%);
+  --sl-warning-bg:       hsl(38, 88%, 96%);
+  --sl-warning-border:   hsl(38, 88%, 82%);
+
+  --sl-radius-xs:        3px;
+  --sl-radius-sm:        4px;
+  --sl-radius:           5px;
+  --sl-radius-md:        6px;
+
+  --sl-shadow-xs:        0 1px 2px rgba(30, 40, 60, 0.05);
+  --sl-shadow-sm:        0 1px 3px rgba(30, 40, 60, 0.07), 0 1px 2px rgba(30, 40, 60, 0.04);
+  --sl-shadow:           0 2px 6px rgba(30, 40, 60, 0.08), 0 1px 3px rgba(30, 40, 60, 0.05);
+  --sl-shadow-md:        0 4px 14px rgba(30, 40, 60, 0.10), 0 2px 4px rgba(30, 40, 60, 0.06);
+  --sl-shadow-lg:        0 8px 28px rgba(30, 40, 60, 0.12), 0 3px 8px rgba(30, 40, 60, 0.07);
+
+  --sl-transition:       all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+  --sl-transition-slow:  all 0.32s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--sl-text);
+  background: var(--sl-bg);
+}
+
+img { display: block; max-width: 100%; }
+a { color: var(--sl-primary); text-decoration: none; gap: 8px; }
+a:hover { text-decoration: underline; }
+button { font-family: inherit; cursor: pointer; }
+input, select, textarea { font-family: inherit; }
+
+@keyframes sl-fade-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes sl-spin {
+  to { transform: rotate(360deg); }
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 16px;
+  font-size: 13.5px;
+  font-weight: 600;
+  border-radius: var(--sl-radius);
+  border: 1px solid transparent;
+  transition: var(--sl-transition);
+  line-height: 1.2;
+  white-space: nowrap;
+  user-select: none;
+}
+
+.btn-primary {
+  background: var(--sl-primary);
+  color: var(--sl-text-inverse);
+  border-color: var(--sl-primary);
+}
+
+.btn-primary:hover {
+  background: var(--sl-primary-hover);
+  border-color: var(--sl-primary-hover);
+  box-shadow: 0 2px 8px rgba(30, 58, 95, 0.28);
+}
+
+.btn-secondary {
+  background: var(--sl-bg-card);
+  color: var(--sl-text);
+  border-color: var(--sl-border-strong);
+}
+
+.btn-secondary:hover {
+  background: var(--sl-bg-hover);
+  border-color: var(--sl-border-strong);
+}
+
+.btn-ghost {
+  background: transparent;
+  color: var(--sl-text-muted);
+  border-color: transparent;
+}
+
+.btn-ghost:hover {
+  background: var(--sl-bg-hover);
+  color: var(--sl-text);
+}
+
+.btn-sm { padding: 6px 12px; font-size: 12.5px; }
+.btn-lg { padding: 12px 24px; font-size: 14.5px; }
+.btn-full { width: 100%; }
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.form-label {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--sl-text);
+}
+
+.form-input {
+  width: 100%;
+  height: 38px;
+  padding: 0 12px;
+  font-size: 13.5px;
+  color: var(--sl-text);
+  background: var(--sl-bg-card);
+  border: 1px solid var(--sl-border-strong);
+  border-radius: var(--sl-radius-sm);
+  outline: none;
+  transition: var(--sl-transition);
+}
+
+.form-input:focus {
+  border-color: var(--sl-border-focus);
+  box-shadow: 0 0 0 3px hsla(210, 65%, 36%, 0.12);
+}
+
+.card {
+  background: var(--sl-bg-card);
+  border: 1px solid var(--sl-border);
+  border-radius: var(--sl-radius-md);
+  box-shadow: var(--sl-shadow-xs);
+}
+
+.card-header {
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--sl-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.card-body { padding: 18px; }
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  font-size: 11.5px;
+  font-weight: 600;
+  border-radius: var(--sl-radius-xs);
+  white-space: nowrap;
+}
+
+.badge-success { background: var(--sl-success-bg); color: var(--sl-success); border: 1px solid var(--sl-success-border); }
+.badge-danger  { background: var(--sl-danger-bg);  color: var(--sl-danger);  border: 1px solid var(--sl-danger-border); }
+.badge-warning { background: var(--sl-warning-bg); color: var(--sl-warning); border: 1px solid var(--sl-warning-border); }
+.badge-neutral { background: var(--sl-bg-secondary); color: var(--sl-text-muted); border: 1px solid var(--sl-border-strong); }
+.badge-primary { background: var(--sl-primary-light); color: var(--sl-primary); border: 1px solid var(--sl-primary-muted); }
+
+.toast-container {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 2000;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.toast {
+  background: var(--sl-bg-card);
+  border: 1px solid var(--sl-border-strong);
+  box-shadow: var(--sl-shadow-lg);
+  border-radius: var(--sl-radius-md);
+  padding: 12px 18px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--sl-text);
+  transform: translateY(100px);
+  opacity: 0;
+  transition: var(--sl-transition-slow);
+}
+
+.toast.show {
+  transform: translateY(0);
+  opacity: 1;
+}

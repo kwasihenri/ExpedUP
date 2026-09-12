@@ -44,41 +44,41 @@ DOMAIN_TLDS = [
     ".store", ".online", ".co", ".xyz", ".me", ".site", ".shop", ".africa", ".ng", ".ke", ".co.uk"
 ]
 
-# Theme Tokens (Light Mode Default with full Dark Mode support, inspired by Vectihost & Selligine design systems)
+# Theme Tokens (Exact Selligine Design System palette for desktop GUI)
 # Uses (light_mode_color, dark_mode_color) tuples so CustomTkinter natively switches every element on appearance change.
 THEME_COLORS = {
     # Surfaces & Backgrounds
-    "bg": ("#f1f5f9", "#0b0f19"),              # Page canvas (slate-100 in light / deep obsidian in dark)
-    "card": ("#ffffff", "#111827"),            # Card surface (pure white in light / slate-900 in dark)
-    "card_subtle": ("#f8fafc", "#1e293b"),     # Muted item box (slate-50 in light / slate-800 in dark)
-    "card_alt": ("#e2e8f0", "#182234"),       # Active item box
+    "bg": ("#f1f5f9", "#090d16"),              # Page canvas (slate-100 in light / deep obsidian in dark)
+    "card": ("#ffffff", "#0d1322"),            # Card surface (pure white in light / slate-900 in dark)
+    "card_subtle": ("#edf4fa", "#151d30"),     # Muted item box (Selligine primary light in light / slate-800 in dark)
+    "card_alt": ("#e7ecf2", "#1b253b"),       # Active item box
     "input_bg": ("#ffffff", "#0f172a"),        # Text entry background
-    "border": ("#e2e8f0", "#1f2937"),          # Card border (slate-200 in light / slate-800 in dark)
-    "border_strong": ("#cbd5e1", "#374151"),   # Stronger divider
+    "border": ("#e2e7ee", "#1f2937"),          # Card border (slate-200 in light / slate-800 in dark)
+    "border_strong": ("#cbd4e1", "#374151"),   # Stronger divider
     
     # Typography
-    "text_primary": ("#0f172a", "#f8fafc"),    # Headings & primary labels (slate-900 / slate-50)
-    "text_secondary": ("#475569", "#94a3b8"),  # Subtitles & secondary notes (slate-600 / slate-400)
+    "text_primary": ("#1a212d", "#f8fafc"),    # Headings & primary labels (slate-900 / slate-50)
+    "text_secondary": ("#687484", "#94a3b8"),  # Subtitles & secondary notes (slate-600 / slate-400)
     "text_muted": ("#94a3b8", "#64748b"),      # Placeholders & timestamps
 
-    # Primary Action (Royal Blue)
-    "primary": ("#2563eb", "#3b82f6"),
-    "primary_hover": ("#1d4ed8", "#2563eb"),
+    # Primary Action (Selligine Slate Teal / ExpedUP Blue)
+    "primary": ("#204870", "#38bdf8"),
+    "primary_hover": ("#1a3a5a", "#0284c7"),
     
     # Secondary Action (Slate Neutral)
     "secondary": ("#f1f5f9", "#1e293b"),
-    "secondary_hover": ("#e2e8f0", "#334155"),
+    "secondary_hover": ("#e2e7ee", "#334155"),
     "secondary_text": ("#334155", "#e2e8f0"),
 
     # Status & Accents
-    "accent": ("#0284c7", "#38bdf8"),          # Sky Blue
+    "accent": ("#204870", "#38bdf8"),          # Selligine Slate Teal / Sky Blue
     "accent_purple": ("#7c3aed", "#a855f7"),  # Purple
-    "success": ("#16a34a", "#10b981"),         # Emerald Green
-    "warning": ("#d97706", "#f59e0b"),         # Amber
-    "danger": ("#dc2626", "#ef4444"),          # Rose Red
+    "success": ("#329051", "#10b981"),         # Selligine Emerald Green
+    "warning": ("#e08a0d", "#f59e0b"),         # Amber
+    "danger": ("#c82f2f", "#ef4444"),          # Rose Red
 
     # Terminal Console (Always Dark for contrast)
-    "console_bg": ("#0f172a", "#050811"),
+    "console_bg": ("#090d16", "#050811"),
     "console_text": ("#38bdf8", "#38bdf8"),
 }
 

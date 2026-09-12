@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ExpedUP — Modern Web Search &amp; Brand Intelligence Engine</title>
+
+  <meta name="description" content="ExpedUP is a fast, 100% private search engine for checking username availability, finding verified social profiles, and domain name research.">
+  <meta name="keywords" content="ExpedUP, People Finder, Brand Clearance, Username Search, Social Media Scanner, Domain Checker">
+  <meta name="author" content="Kwasi Henri">
+
+  <meta property="og:title" content="ExpedUP — Modern Web Search &amp; Brand Intelligence Engine">
+  <meta property="og:description" content="Instant multi-source web search, username availability checker, and profile finder running 100% on your device.">
+  <meta property="og:type" content="website">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
+  <link rel="stylesheet" href="css/styles.css">
+  <link rel="stylesheet" href="css/layout.css">
+</head>
+<body class="lp">
+
+  <div class="lp-fixed-bg"></div>
+
+  <nav class="lp-nav">
+    <a href="#" class="lp-logo">
+      <div class="lp-logo-mark">
+        <i class="fa-solid fa-compass"></i>
+      </div>
+      ExpedUP
+    </a>
+
+    <ul class="lp-nav-links">
+      <li><a href="#features">Features</a></li>
+      <li><a href="#how">How It Works</a></li>
+      <li><a href="#matrix">Capabilities</a></li>
+      <li><a href="#downloads">Downloads</a></li>
+      <li><a href="#reviews">Reviews</a></li>
+    </ul>
+
+    <div class="lp-nav-right">
+      <a href="downloads/ExpedUP_Setup_v2.0.exe" class="lp-btn-primary">
+        <i class="fa-brands fa-windows"></i> Download Windows
+      </a>
+    </div>
+  </nav>
+
+  <section class="lp-hero">
+    <div class="lp-hero-inner">
+      <div class="fly-left" data-delay="0">
+        <div class="lp-hero-eyebrow">
+          <i class="fa-solid fa-sparkles" style="color:var(--sl-primary);"></i> ExpedUP v2.0 Released
+        </div>
+
+        <h1 class="lp-hero-title">
+          Smart web search &amp; <em>brand research</em> for everyone
+        </h1>
+
+        <p class="lp-hero-sub">
+          ExpedUP scans over 100+ websites, social networks, domains, and public registries to deliver clear, organized answers in seconds.
+        </p>
+
+        <div class="lp-hero-cta">
+          <a href="downloads/ExpedUP_Setup_v2.0.exe" class="lp-btn-hero">
+            <i class="fa-brands fa-windows"></i> Download for Windows
+          </a>
+          <a href="#demo" class="lp-btn-hero-outline">
+            <i class="fa-solid fa-magnifying-glass"></i> Live Demo
+          </a>
+        </div>
+
+        <div class="lp-hero-stats">
+          <div class="lp-stat">
+            <div class="lp-stat-val">100<span>%</span></div>
+            <div class="lp-stat-lbl">Private &amp; Offline</div>
+          </div>
+          <div class="lp-stat" style="border-left: 1px solid var(--sl-border); padding-left: 18px;">
+            <div class="lp-stat-val">100<span>+</span></div>
+            <div class="lp-stat-lbl">Web Sources</div>
+          </div>
+          <div class="lp-stat" style="border-left: 1px solid var(--sl-border); padding-left: 18px;">
+            <div class="lp-stat-val">&lt;3<span>s</span></div>
+            <div class="lp-stat-lbl">Execution Speed</div>
+          </div>
+        </div>
+      </div>
+
+      <div id="demo" class="fly-right" data-delay="100">
+        <div style="display:flex; gap:8px; margin-bottom:10px;">
+          <input type="text" id="demo-search-input" class="form-input" value="kwasihenri" style="padding:6px 12px; font-size:13px;" placeholder="Search handle or name...">
+          <button id="demo-search-btn" class="lp-btn-primary" style="padding:6px 14px;">Scan</button>
+        </div>
+
+        <div id="demo-stack-results" class="lp-hero-stack">
+          <div class="lp-stack-card">
+            <div class="lp-stack-head">
+              <span class="lp-stack-title">Expedition Report: KWASIHENRI</span>
+              <span class="badge badge-success">Completed</span>
+            </div>
+            <div class="lp-stack-row">
+              <span><i class="fa-brands fa-github" style="color:var(--sl-primary);"></i> GitHub Profile</span>
+              <span class="lp-badge-ok">Active Match</span>
+            </div>
+            <div class="lp-stack-row">
+              <span><i class="fa-brands fa-x-twitter" style="color:var(--sl-primary);"></i> X / Twitter</span>
+              <span class="lp-badge-ok">Verified</span>
+            </div>
+            <div class="lp-stack-row">
+              <span><i class="fa-solid fa-globe" style="color:var(--sl-success);"></i> Domain (kwasihenri.dev)</span>
+              <span class="lp-badge-warn">Available</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="lp-trusted">
+    <div class="lp-trusted-lbl">Built for Modern Search &amp; Verification</div>
+    <div class="lp-trusted-grid">
+      <div class="lp-trusted-item"><i class="fa-solid fa-shield-halved" style="color:var(--sl-primary);"></i> Brand Protection</div>
+      <div class="lp-trusted-item"><i class="fa-solid fa-at" style="color:var(--sl-primary);"></i> Handle Checker</div>
+      <div class="lp-trusted-item"><i class="fa-solid fa-globe" style="color:var(--sl-primary);"></i> Domain Research</div>
+      <div class="lp-trusted-item"><i class="fa-solid fa-user-check" style="color:var(--sl-primary);"></i> Profile Verification</div>
+    </div>
+  </section>
+
+  <section class="lp-section" id="features" style="padding:80px 5vw;">
+    <div class="lp-inner">
+      <div class="lp-center fly-down" data-delay="0">
+        <div class="lp-eyebrow">Powerful Search</div>
+        <h2 class="lp-h2">Essential tools for <em>every search requirement</em></h2>
+        <p class="lp-sub">Check usernames, research domain availability, and find official public links effortlessly.</p>
+      </div>
+
+      <div class="lp-feat-grid">
+        <div class="lp-feat-card fly-up" data-delay="0">
+          <div class="lp-feat-icon"><i class="fa-solid fa-user-check"></i></div>
+          <div class="lp-feat-title">Username Checker</div>
+          <div class="lp-feat-desc">Instantly check if your desired handle is free across Twitter, Instagram, GitHub, YouTube, and 50+ platforms.</div>
+        </div>
+
+        <div class="lp-feat-card fly-up" data-delay="90">
+          <div class="lp-feat-icon"><i class="fa-solid fa-globe"></i></div>
+          <div class="lp-feat-title">Domain Name Finder</div>
+          <div class="lp-feat-desc">Discover registered websites, active web pages, and alternative domain extensions (`.dev`, `.com`, `.io`, `.app`).</div>
+        </div>
+
+        <div class="lp-feat-card fly-up" data-delay="180">
+          <div class="lp-feat-icon"><i class="fa-solid fa-lock"></i></div>
+          <div class="lp-feat-title">100% Private &amp; Offline</div>
+          <div class="lp-feat-desc">Everything runs locally on your own computer. No data collection, no account signups, zero tracking.</div>
+        </div>
+
+        <div class="lp-feat-card fly-up" data-delay="270">
+          <div class="lp-feat-icon"><i class="fa-solid fa-address-card"></i></div>
+          <div class="lp-feat-title">Public Profile Finder</div>
+          <div class="lp-feat-desc">Locate official public profile links, portfolios, and contact points belonging to any brand or person.</div>
+        </div>
+
+        <div class="lp-feat-card fly-up" data-delay="360">
+          <div class="lp-feat-icon"><i class="fa-solid fa-file-export"></i></div>
+          <div class="lp-feat-title">PDF &amp; Markdown Reports</div>
+          <div class="lp-feat-desc">Export search findings into clean summary reports to share with colleagues or save for later reference.</div>
+        </div>
+
+        <div class="lp-feat-card fly-up" data-delay="450">
+          <div class="lp-feat-icon"><i class="fa-solid fa-bolt"></i></div>
+          <div class="lp-feat-title">Super-Fast Execution</div>
+          <div class="lp-feat-desc">Scans multiple sources in parallel to deliver thorough, accurate answers in under 3 seconds.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="lp-stripe" id="how">
+    <div class="lp-inner">
+      <div class="lp-center fly-down" data-delay="0">
+        <div class="lp-eyebrow">Simple Workflow</div>
+        <h2 class="lp-h2">Ready in <em>4 simple steps</em></h2>
+      </div>
+
+      <div class="lp-steps">
+        <div class="lp-step fly-scale" data-delay="0">
+          <div class="lp-step-num">01</div>
+          <div class="lp-step-title">Enter Target Name</div>
+          <div class="lp-step-desc">Type any person's name, brand title, or social media handle.</div>
+        </div>
+        <div class="lp-step fly-scale" data-delay="120">
+          <div class="lp-step-num">02</div>
+          <div class="lp-step-title">Multi-Probe Scan</div>
+          <div class="lp-step-desc">ExpedUP automatically probes 100+ social and web sources.</div>
+        </div>
+        <div class="lp-step fly-scale" data-delay="240">
+          <div class="lp-step-num">03</div>
+          <div class="lp-step-title">Verify Matches</div>
+          <div class="lp-step-desc">Review active social profiles and available web domains.</div>
+        </div>
+        <div class="lp-step fly-scale" data-delay="360">
+          <div class="lp-step-num">04</div>
+          <div class="lp-step-title">Export Summary</div>
+          <div class="lp-step-desc">Save your organized findings into PDF or Markdown reports.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="lp-stripe2" id="matrix">
+    <div class="lp-roles-grid">
+      <div class="fly-left" data-delay="100">
+        <div class="lp-eyebrow">Persona Solutions</div>
+        <h2 class="lp-h2">
+          Tailored features<br><em>for your goals</em>
+        </h2>
+        <div class="lp-role-chips">
+          <div class="lp-role-chip active">
+            <div class="lp-role-chip-icon"><i class="fa-solid fa-bullhorn"></i></div>
+            <div>
+              <h4>Creators &amp; Marketers</h4>
+              <p>Check handle availability and protect brand identity across social networks.</p>
+            </div>
+          </div>
+          <div class="lp-role-chip">
+            <div class="lp-role-chip-icon"><i class="fa-solid fa-magnifying-glass"></i></div>
+            <div>
+              <h4>Researchers &amp; Analysts</h4>
+              <p>Gather verified public records, domain data, and organized research reports.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="lp-perm-panel fly-right" data-delay="200">
+        <div class="lp-perm-head">
+          <div class="lp-perm-head-title">Capabilities Matrix</div>
+          <div class="lp-perm-head-cols">
+            <div class="lp-perm-head-col">Creator</div>
+            <div class="lp-perm-head-col">Research</div>
+            <div class="lp-perm-head-col">General</div>
+          </div>
+        </div>
+        <div class="lp-perm-row">
+          <div class="lp-perm-name">Username Availability Scan</div>
+          <div class="lp-perm-cells">
+            <div class="lp-perm-cell"><span class="lp-tick"><i class="fa-solid fa-check"></i></span></div>
+            <div class="lp-perm-cell"><span class="lp-tick"><i class="fa-solid fa-check"></i></span></div>
+            <div class="lp-perm-cell"><span class="lp-tick"><i class="fa-solid fa-check"></i></span></div>
+          </div>
+        </div>
+        <div class="lp-perm-row">
+          <div class="lp-perm-name">Domain TLD Research</div>
+          <div class="lp-perm-cells">
+            <div class="lp-perm-cell"><span class="lp-tick"><i class="fa-solid fa-check"></i></span></div>
+            <div class="lp-perm-cell"><span class="lp-tick"><i class="fa-solid fa-check"></i></span></div>
+            <div class="lp-perm-cell"><span class="lp-dash">—</span></div>
+          </div>
+        </div>
+        <div class="lp-perm-row">
+          <div class="lp-perm-name">100% Private Offline Execution</div>
+          <div class="lp-perm-cells">
+            <div class="lp-perm-cell"><span class="lp-tick"><i class="fa-solid fa-check"></i></span></div>
+            <div class="lp-perm-cell"><span class="lp-tick"><i class="fa-solid fa-check"></i></span></div>
+            <div class="lp-perm-cell"><span class="lp-tick"><i class="fa-solid fa-check"></i></span></div>
+          </div>
+        </div>
+        <div class="lp-perm-row">
+          <div class="lp-perm-name">PDF / Markdown Export</div>
+          <div class="lp-perm-cells">
+            <div class="lp-perm-cell"><span class="lp-tick"><i class="fa-solid fa-check"></i></span></div>
+            <div class="lp-perm-cell"><span class="lp-tick"><i class="fa-solid fa-check"></i></span></div>
+            <div class="lp-perm-cell"><span class="lp-dash">—</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="lp-section" id="downloads">
+    <div class="lp-inner">
+      <div class="lp-center fly-down" data-delay="0">
+        <div class="lp-eyebrow">Platform Matrix</div>
+        <h2 class="lp-h2">Download ExpedUP <em>for your OS</em></h2>
+        <p class="lp-sub">Windows version ready to run. macOS, Linux, iOS, and Android builds coming soon.</p>
+      </div>
+
+      <div class="lp-platform-grid">
+        <div class="lp-platform-card fly-up" data-delay="0">
+          <i class="fa-brands fa-windows lp-platform-icon"></i>
+          <div>
+            <div style="font-weight:700; font-size:14px;">Windows</div>
+            <div style="font-size:11px; color:var(--sl-text-muted);">Windows 10 / 11 (64-bit)</div>
+          </div>
+          <a href="downloads/ExpedUP_Setup_v2.0.exe" class="lp-btn-primary btn-full">Download v2.0</a>
+        </div>
+
+        <div class="lp-platform-card fly-up" data-delay="90">
+          <i class="fa-brands fa-apple lp-platform-icon" style="color:var(--sl-text-muted);"></i>
+          <div>
+            <div style="font-weight:700; font-size:14px;">macOS</div>
+            <div style="font-size:11px; color:var(--sl-text-muted);">Apple Silicon &amp; Intel</div>
+          </div>
+          <button class="lp-btn-ghost btn-full" style="border:1px solid var(--sl-border);" data-coming-soon="macOS" data-icon="fa-brands fa-apple">Coming Soon</button>
+        </div>
+
+        <div class="lp-platform-card fly-up" data-delay="180">
+          <i class="fa-brands fa-linux lp-platform-icon" style="color:var(--sl-text-muted);"></i>
+          <div>
+            <div style="font-weight:700; font-size:14px;">Linux / Ubuntu</div>
+            <div style="font-size:11px; color:var(--sl-text-muted);">AppImage &amp; Deb</div>
+          </div>
+          <button class="lp-btn-ghost btn-full" style="border:1px solid var(--sl-border);" data-coming-soon="Linux (Ubuntu)" data-icon="fa-brands fa-linux">Coming Soon</button>
+        </div>
+
+        <div class="lp-platform-card fly-up" data-delay="270">
+          <i class="fa-solid fa-mobile-screen-button lp-platform-icon" style="color:var(--sl-text-muted);"></i>
+          <div>
+            <div style="font-weight:700; font-size:14px;">iOS</div>
+            <div style="font-size:11px; color:var(--sl-text-muted);">iPhone &amp; iPad</div>
+          </div>
+          <button class="lp-btn-ghost btn-full" style="border:1px solid var(--sl-border);" data-coming-soon="iOS" data-icon="fa-solid fa-mobile-screen-button">Coming Soon</button>
+        </div>
+
+        <div class="lp-platform-card fly-up" data-delay="360">
+          <i class="fa-brands fa-android lp-platform-icon" style="color:var(--sl-text-muted);"></i>
+          <div>
+            <div style="font-weight:700; font-size:14px;">Android</div>
+            <div style="font-size:11px; color:var(--sl-text-muted);">Google Play &amp; APK</div>
+          </div>
+          <button class="lp-btn-ghost btn-full" style="border:1px solid var(--sl-border);" data-coming-soon="Android" data-icon="fa-brands fa-android">Coming Soon</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="lp-stripe" id="reviews">
+    <div class="lp-inner">
+      <div class="lp-center fly-down" data-delay="0">
+        <div class="lp-eyebrow">Feedback</div>
+        <h2 class="lp-h2">What users <em>say</em></h2>
+      </div>
+
+      <div class="lp-testi-grid">
+        <div class="lp-testi-card fly-up" data-delay="0">
+          <div class="lp-stars">★★★★★</div>
+          <div class="lp-testi-quote">"ExpedUP saved me hours when launching our new brand. Checked 50+ handle variations instantly!"</div>
+          <div class="lp-testi-author">
+            <div class="lp-testi-avatar" style="background:#0284c7;">K</div>
+            <div>
+              <div class="lp-testi-name">Kwasi Henri</div>
+              <div class="lp-testi-biz">Software Creator</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="lp-testi-card fly-up" data-delay="120">
+          <div class="lp-stars">★★★★★</div>
+          <div class="lp-testi-quote">"Super clean interface and 100% private. Runs fast right on my laptop without any cloud signups."</div>
+          <div class="lp-testi-author">
+            <div class="lp-testi-avatar" style="background:#7c3aed;">L</div>
+            <div>
+              <div class="lp-testi-name">Luuks GH</div>
+              <div class="lp-testi-biz">Digital Lead</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="lp-testi-card fly-up" data-delay="240">
+          <div class="lp-stars">★★★★★</div>
+          <div class="lp-testi-quote">"The export to Markdown feature makes compiling research reports completely effortless."</div>
+          <div class="lp-testi-author">
+            <div class="lp-testi-avatar" style="background:#10b981;">W</div>
+            <div>
+              <div class="lp-testi-name">Waitrive Team</div>
+              <div class="lp-testi-biz">Research Studio</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="lp-cta-section fly-scale" data-delay="100">
+    <div class="lp-cta-inner">
+      <h2 class="lp-cta-title">Upgrade your search workflow today</h2>
+      <p class="lp-cta-sub">
+        Join hundreds of creators and researchers checking usernames and domain availability with confidence.
+      </p>
+      <div class="lp-cta-btns">
+        <a href="downloads/ExpedUP_Setup_v2.0.exe" class="lp-btn-cta-white">
+          <i class="fa-brands fa-windows"></i> Free Download for Windows
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <footer class="lp-footer">
+    <div class="lp-footer-inner">
+      <div class="lp-footer-grid">
+        <div class="lp-footer-about">
+          <div class="lp-logo">
+            <div class="lp-logo-mark">
+              <i class="fa-solid fa-compass"></i>
+            </div>
+            ExpedUP
+          </div>
+          <p>High-performance web search &amp; brand clearance tool for everyday users.</p>
+        </div>
+        <div>
+          <div class="lp-footer-col-title">Product</div>
+          <ul class="lp-footer-col-links">
+            <li><a href="#features">Features</a></li>
+            <li><a href="#how">How it works</a></li>
+            <li><a href="#matrix">Capabilities</a></li>
+          </ul>
+        </div>
+        <div>
+          <div class="lp-footer-col-title">Downloads</div>
+          <ul class="lp-footer-col-links">
+            <li><a href="downloads/ExpedUP_Setup_v2.0.exe">Windows v2.0</a></li>
+            <li><a href="#downloads">macOS (Soon)</a></li>
+            <li><a href="#downloads">Linux (Soon)</a></li>
+          </ul>
+        </div>
+        <div>
+          <div class="lp-footer-col-title">Open Source</div>
+          <ul class="lp-footer-col-links">
+            <li><a href="https://github.com/kwasihenri/ExpedUP" target="_blank">GitHub Repository</a></li>
+            <li><a href="#">MIT License</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="lp-footer-bottom">
+        <div class="lp-footer-copy">
+          &copy; 2026 ExpedUP. | Built with Selligine Design System.
+        </div>
+        <div class="lp-footer-socials">
+          <div class="lp-social"><i class="fa-brands fa-x-twitter"></i></div>
+          <div class="lp-social"><i class="fa-brands fa-github"></i></div>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <div id="platform-modal" class="modal-overlay">
+    <div class="modal-card">
+      <button id="modal-close-btn" class="modal-close"><i class="fa-solid fa-xmark"></i></button>
+      <div style="font-size: 2.2rem; color: var(--sl-primary); margin-bottom: 12px;">
+        <i id="modal-platform-icon" class="fa-solid fa-desktop"></i>
+      </div>
+      <h3 style="font-size: 1.25rem; font-weight: 800; margin-bottom: 6px;"><span id="modal-platform-name">Platform</span> Build Coming Soon!</h3>
+      <p style="font-size: 0.88rem; color: var(--sl-text-muted); margin-bottom: 18px;">We are finishing up the build for this platform. Enter your email below to get notified on release.</p>
+
+      <form id="waitlist-form" style="display:flex; gap:8px;">
+        <input type="email" class="form-input" placeholder="Enter your email..." required>
+        <button type="submit" class="lp-btn-primary" style="padding:8px 16px;">Notify Me</button>
+      </form>
+    </div>
+  </div>
+
+  <script src="js/main.js"></script>
+</body>
+</html>
